@@ -9,6 +9,7 @@ import {
 } from "firebase/auth";
 import { ArrowRight, Eye, EyeOff, LockKeyhole, ShieldCheck, WalletCards } from "lucide-react";
 import { auth, firebaseConfigured } from "./firebase.js";
+import AdminPanel from "./AdminPanel.jsx";
 
 const ADMIN_EMAIL = "admin@novopay.app";
 
@@ -139,6 +140,8 @@ export default function App() {
         </main>
       );
     }
+    if (isAdminPath && isAdmin) return <AdminPanel user={user} onLogout={handleLogout} />;
+
     if (isDashboardPath && isAdmin) {
       navigate("/admin");
       return null;
