@@ -9,7 +9,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "@vitejs/plugin-react": "latest",
+    "@vitejs/plugin-react": "^5.0.0",
     "firebase": "^12.0.0",
     "lucide-react": "^0.468.0",
     "react": "^19.0.0",
