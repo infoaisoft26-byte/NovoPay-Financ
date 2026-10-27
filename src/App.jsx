@@ -10,6 +10,7 @@ import {
 import { ArrowRight, Eye, EyeOff, LockKeyhole, ShieldCheck, WalletCards } from "lucide-react";
 import { auth, firebaseConfigured } from "./firebase.js";
 import AdminPanel from "./AdminPanel.jsx";
+import UserDashboard from "./UserDashboard.jsx";
 
 const ADMIN_EMAIL = "admin@novopay.app";
 
@@ -146,6 +147,7 @@ export default function App() {
       navigate("/admin");
       return null;
     }
+    if (isDashboardPath && !isAdmin) return <UserDashboard user={user} onLogout={handleLogout} />;
     return (
       <main className="np-dashboard">
         <header className="np-dash-header">
