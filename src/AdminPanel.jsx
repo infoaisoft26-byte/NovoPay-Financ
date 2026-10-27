@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   LayoutDashboard, Users, ArrowDownToLine, ArrowUpFromLine, ReceiptText,
   Package, ChartNoAxesCombined, Settings, Search, Bell, Menu, X, ShieldCheck,
@@ -73,6 +73,33 @@ const emptyTitles = {
   Settings: "Settings service is not connected",
 };
 
+const sectionSlugs = {
+  Overview: "overview", Users: "users", "KYC Approvals": "kyc", Deposits: "deposits",
+  Withdrawals: "withdrawals", Transactions: "transactions", "P2P Transfers": "p2p",
+  Packages: "packages", "Package Activations": "activations", "Support Tickets": "support",
+  "Website Feedback": "feedback", "Survey Responses": "surveys", "Audit Logs": "audit", "Offer Posters": "posters",
+};
+
+function recordCells(section, row) {
+  const amount = (value, currency = "USDT") => value == null ? "—" : String(value) + " " + currency;
+  switch (section) {
+    case "Users": return [String(row.novopay_id || row.id) + " · " + (row.full_name || "") + " · " + (row.email || ""), row.status, "Fund: " + amount(row.fund_balance) + " / Income: " + amount(row.income_balance)];
+    case "KYC Approvals": return [row.user_id, row.status, (row.document_type || "Document") + " · " + (row.reviewed_at || "Not reviewed")];
+    case "Deposits": return [row.reference, row.status, amount(row.amount, row.currency) + " · " + (row.tx_hash || "No TX hash")];
+    case "Withdrawals": return [row.reference, row.status, amount(row.amount, row.currency) + " · fee " + row.fee + " · net " + row.net_amount];
+    case "Transactions": return [row.reference, row.type + " · " + row.status, row.user_id + " · " + amount(row.amount, row.currency)];
+    case "P2P Transfers": return [row.reference, row.status, row.sender_user_id + " → " + row.receiver_user_id + " · " + amount(row.amount, row.currency)];
+    case "Packages": return [row.name, row.status, amount(row.price, row.currency) + " · " + (row.description || "")];
+    case "Package Activations": return [row.reference, row.status, row.user_id + " · " + (row.package_id || "No package") + " · " + amount(row.amount, row.currency)];
+    case "Support Tickets": return [row.reference, row.status, row.user_id + " · " + row.subject];
+    case "Website Feedback": return [row.id, row.status, (row.user_id || "Anonymous") + " · " + row.message];
+    case "Survey Responses": return [row.id, row.survey_key, JSON.stringify(row.response)];
+    case "Audit Logs": return [row.id, row.actor_uid, row.action + " · " + (row.entity_type || "") + " · " + (row.entity_id || "")];
+    case "Offer Posters": return [row.title, row.status, row.image_url];
+    default: return [row.id || "—", row.status || "—", "—"];
+  }
+}
+
 const tableColumns = {
   Users: ["USER / NOVOPAY ID", "ACCOUNT STATUS", "WALLET SUMMARY"],
   "KYC Approvals": ["SUBMISSION", "REVIEW STATUS", "DECISION"],
@@ -98,6 +125,11 @@ export default function AdminPanel({ user, onLogout }) {
   const [query, setQuery] = useState("");
   const [lastRefresh, setLastRefresh] = useState(null);
   const [notice, setNotice] = useState("");
+  const [rows, setRows] = useState([]);
+  const [overviewCounts, setOverviewCounts] = useState(null);
+  const [dataError, setDataError] = useState("");
+  const [loadingData, setLoadingData] = useState(false);
+  const [reloadKey, setReloadKey] = useState(0);
   const sections = useMemo(() => navGroups.flatMap(g => g.items), []);
   const active = sections.find(x => x.label === section) || { icon: LayoutDashboard };
   const ActiveIcon = active.icon;
@@ -111,8 +143,42 @@ export default function AdminPanel({ user, onLogout }) {
 
   function requestRefresh() {
     setLastRefresh(new Date().toLocaleTimeString());
-    setNotice("Refresh requested. Live records will appear after NovoPay's independent backend is connected.");
+    setReloadKey(value => value + 1);
   }
+
+  useEffect(() => {
+    const slug = sectionSlugs[section];
+    if (!slug) {
+      setRows([]);
+      setOverviewCounts(null);
+      setDataError("This module needs its own verified NovoPay data query.");
+      setLoadingData(false);
+      return undefined;
+    }
+    let cancelled = false;
+    const timer = window.setTimeout(async () => {
+      setLoadingData(true);
+      setDataError("");
+      try {
+        const token = await user.getIdToken();
+        const params = new URLSearchParams({ section: slug });
+        if (section !== "Overview" && query.trim()) params.set("q", query.trim());
+        const response = await fetch("/api/admin?" + params.toString(), { headers: { Authorization: "Bearer " + token }, cache: "no-store" });
+        const payload = await response.json().catch(() => ({}));
+        if (!response.ok) {
+          if (response.status === 403) throw new Error("Admin server permission is not set. Set the Firebase custom claim admin=true for the NovoPay admin account.");
+          if (response.status === 503) throw new Error("NovoPay backend is not configured yet. Set DATABASE_URL and FIREBASE_SERVICE_ACCOUNT_JSON on the NovoPay Vercel project.");
+          throw new Error(payload.error || "Admin data could not be loaded.");
+        }
+        if (cancelled) return;
+        if (section === "Overview") setOverviewCounts(payload.counts || null);
+        else setRows(Array.isArray(payload.rows) ? payload.rows : []);
+      } catch (error) {
+        if (!cancelled) { setRows([]); setOverviewCounts(null); setDataError(error.message || "Admin data could not be loaded."); }
+      } finally { if (!cancelled) setLoadingData(false); }
+    }, query ? 250 : 0);
+    return () => { cancelled = true; window.clearTimeout(timer); };
+  }, [section, query, reloadKey, user]);
 
   const quickLinks = [
     { label: "Manage users", desc: "Accounts and wallet summaries", icon: Users, target: "Users" },
@@ -185,7 +251,7 @@ export default function AdminPanel({ user, onLogout }) {
                 { label: "Active packages", icon: Package, note: "Waiting for package configuration" },
                 { label: "Open support tickets", icon: LifeBuoy, note: "Waiting for support records" },
                 { label: "Audit events", icon: ScrollText, note: "Waiting for security event records" },
-              ].map(stat => { const Icon = stat.icon; return <article className="np-admin-stat-card" key={stat.label}><div className="np-admin-stat-top"><span>{stat.label}</span><span className="np-admin-stat-icon"><Icon size={19}/></span></div><strong className="np-admin-stat-value">—</strong><small>{stat.note}</small></article>; })}
+              ].map(stat => { const Icon = stat.icon; return <article className="np-admin-stat-card" key={stat.label}><div className="np-admin-stat-top"><span>{stat.label}</span><span className="np-admin-stat-icon"><Icon size={19}/></span></div><strong className="np-admin-stat-value">{overviewCounts ? ({ "Registered users": overviewCounts.users, "Pending deposits": overviewCounts.pendingDeposits, "Pending withdrawals": overviewCounts.pendingWithdrawals, "Ledger transactions": overviewCounts.transactions, "KYC reviews": overviewCounts.pendingKyc, "Active packages": overviewCounts.activePackages, "Open support tickets": overviewCounts.openTickets, "Audit events": overviewCounts.auditEvents }[stat.label] ?? "—") : "—"}</strong><small>{overviewCounts ? "Live NovoPay database count" : stat.note}</small></article>; })}
             </div>
             <div className="np-admin-overview-grid">
               <section className="np-admin-panel np-admin-activity-panel">
@@ -197,13 +263,14 @@ export default function AdminPanel({ user, onLogout }) {
                 {quickLinks.map(item => { const Icon = item.icon; return <button className="np-admin-quick-link" key={item.label} onClick={() => selectSection(item.target)}><span className="np-admin-quick-icon"><Icon size={18}/></span><span><b>{item.label}</b><small>{item.desc}</small></span><ChevronRight size={17}/></button>; })}
               </section>
             </div>
-            <div className="np-admin-backend-banner"><Database size={19}/><div><b>Independent backend connection required</b><p>These modules are now available in the NovoPay admin navigation. Live users, wallet balances, approvals, reports and package changes must be wired to NovoPay's own database and secure server-side authorization before financial actions can be enabled.</p></div></div>
+            <div className="np-admin-backend-banner"><Database size={19}/><div><b>{overviewCounts ? "Connected to NovoPay database" : "NovoPay backend status"}</b><p>{dataError || (overviewCounts ? "Counts above were loaded from the independent NovoPay database. Financial write actions remain disabled until audited transactional endpoints are implemented." : "The admin API is read-only and requires a dedicated NovoPay database plus a server-verified Firebase admin claim. No sample financial data is displayed.")}</p></div></div>
           </> : <section className="np-admin-panel np-admin-data-panel">
             <div className="np-admin-data-toolbar"><div className="np-admin-data-title"><span className="np-admin-stat-icon"><ActiveIcon size={19}/></span><div><h3>{section} management</h3><p>{descriptions[section]}</p></div></div>
               <label className="np-admin-search"><Search size={16}/><input value={query} onChange={e => setQuery(e.target.value)} placeholder={section === "Users" ? "Search by email or NovoPay ID" : "Search records"} /></label>
             </div>
             <div className="np-admin-table-head">{(tableColumns[section] || ["RECORD", "STATUS", "DETAILS"]).map(col => <span key={col}>{col}</span>)}</div>
-            <div className="np-admin-empty np-admin-section-empty"><span className="np-admin-empty-icon"><ActiveIcon size={22}/></span><b>{emptyTitles[section] || "No records available"}</b><p>{query ? "Search cannot return results until real NovoPay records are connected." : "The module layout is ready, but this section has no connected live data source yet. Actions affecting accounts or financial records are intentionally not simulated."}</p><button className="np-admin-secondary" onClick={() => setNotice("Next implementation step: create and connect the NovoPay-specific data model and enforce administrator permissions on the server.")}><Database size={15}/> View connection requirement</button></div>
+            {dataError && <div className="np-admin-inline-error" role="status"><ShieldAlert size={17}/><span>{dataError}</span></div>}
+            {loadingData ? <div className="np-admin-empty np-admin-section-empty"><RefreshCw size={22}/><b>Loading NovoPay records…</b><p>Reading from the authenticated admin API.</p></div> : rows.length ? <div className="np-admin-record-list">{rows.map((row, index) => <div className="np-admin-record-row" key={row.id || row.reference || index}>{recordCells(section, row).map((cell, cellIndex) => <span key={cellIndex} title={String(cell ?? "")}>{cell == null || cell === "" ? "—" : String(cell)}</span>)}</div>)}</div> : <div className="np-admin-empty np-admin-section-empty"><span className="np-admin-empty-icon"><ActiveIcon size={22}/></span><b>{dataError ? "Records unavailable" : emptyTitles[section] || "No records available"}</b><p>{dataError ? "Resolve the backend configuration or admin permission message above, then refresh." : query ? "No records matched this search." : "No records exist in this section yet. No sample financial records are invented."}</p></div>}
           </section>}
           <footer className="np-admin-footer"><span>© {new Date().getFullYear()} NovoPay Finance</span><span><ShieldCheck size={14}/> Independent admin workspace</span>{lastRefresh && <span>Refresh requested at {lastRefresh}</span>}</footer>
         </div>
