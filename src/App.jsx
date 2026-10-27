@@ -45,7 +45,7 @@ export default function App() {
       if (nextUser && path === "/") {
         navigate(nextUser.email?.toLowerCase() === ADMIN_EMAIL ? "/admin" : "/dashboard");
       }
-      if (!nextUser && (path.startsWith("/admin") || path.startsWith("/dashboard"))) {
+      if (!nextUser && ((path.startsWith("/admin") && path !== "/admin/login") || path.startsWith("/dashboard"))) {
         navigate("/");
       }
     });
@@ -209,7 +209,7 @@ function AuthScreen({ mode, setMode, name, setName, email, setEmail, password, s
           {notice && <p className="np-notice" role="status">{notice}</p>}
           {!firebaseConfigured && <p className="np-notice">Firebase setup pending: required VITE_FIREBASE environment variables configure karein.</p>}
           {adminLogin && <button className="np-back-link" onClick={() => { setMode("login"); navigate("/"); }}>← Back to user login</button>}
-          {!adminLogin && <p className="np-legal">By continuing, you agree to use NovoPay responsibly. Account and financial services are not enabled yet.</p>}
+          {!adminLogin && <><p className="np-legal">By continuing, you agree to use NovoPay responsibly. Account and financial services are not enabled yet.</p><button type="button" className="np-admin-link" onClick={() => { setMode("login"); navigate("/admin/login"); }}>Admin login</button></>}
         </section>
       </section>
       <footer className="np-auth-footer"><span>© NovoPay Finance</span><span><LockKeyhole size={14} /> Protected account access</span></footer>
