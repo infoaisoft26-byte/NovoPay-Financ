@@ -1,99 +1,218 @@
-import { useState } from "react";
-import { ArrowRight, ShieldCheck, WalletCards, CircleHelp, Menu, X, LockKeyhole, Globe2 } from "lucide-react";
+import { useEffect, useState } from "react";
+import {
+  createUserWithEmailAndPassword,
+  onAuthStateChanged,
+  sendPasswordResetEmail,
+  signInWithEmailAndPassword,
+  signOut,
+  updateProfile,
+} from "firebase/auth";
+import { ArrowRight, Eye, EyeOff, LockKeyhole, ShieldCheck, WalletCards } from "lucide-react";
 import { auth, firebaseConfigured } from "./firebase.js";
 
-export default function App() {
-  const [menuOpen, setMenuOpen] = useState(false);
-  const [notice, setNotice] = useState("");
-  const [email, setEmail] = useState("");
+const ADMIN_EMAIL = "admin@novopay.app";
 
-  function handleContinue(event) {
-    event.preventDefault();
-    if (!firebaseConfigured || !auth) {
-      setNotice("Firebase setup is pending. Configure VITE_FIREBASE_API_KEY in the deployment environment before enabling sign-in.");
-      return;
-    }
-    setNotice("Firebase is configured. Account sign-in flow is not enabled in this starter yet.");
+export default function App() {
+  const [path, setPath] = useState(window.location.pathname);
+  const [mode, setMode] = useState("login");
+  const [user, setUser] = useState(null);
+  const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [notice, setNotice] = useState("");
+
+  const isAdminPath = path.startsWith("/admin");
+  const isDashboardPath = path.startsWith("/dashboard");
+
+  function navigate(nextPath) {
+    window.history.pushState({}, "", nextPath);
+    setPath(nextPath);
+    setNotice("");
   }
 
-  return (
-    <div className="app-shell">
-      <header className="topbar">
-        <a className="brand" href="#" aria-label="NovoPay Finance home">
-          <span className="brand-mark"><WalletCards size={22} /></span>
-          <span>NovoPay <b>Finance</b></span>
-        </a>
-        <button className="mobile-menu" onClick={() => setMenuOpen(!menuOpen)} aria-label="Toggle navigation">
-          {menuOpen ? <X /> : <Menu />}
-        </button>
-        <nav className={menuOpen ? "nav-links open" : "nav-links"}>
-          <a href="#features" onClick={() => setMenuOpen(false)}>Platform</a>
-          <a href="#security" onClick={() => setMenuOpen(false)}>Security</a>
-          <a href="#help" onClick={() => setMenuOpen(false)}>Help</a>
-          <a className="nav-cta" href="#access" onClick={() => setMenuOpen(false)}>Get started <ArrowRight size={16} /></a>
-        </nav>
-      </header>
+  useEffect(() => {
+    const handlePopState = () => setPath(window.location.pathname);
+    window.addEventListener("popstate", handlePopState);
+    return () => window.removeEventListener("popstate", handlePopState);
+  }, []);
 
-      <main>
-        <section className="hero">
-          <div className="hero-copy">
-            <div className="eyebrow"><span className="status-dot" /> YOUR FINANCIAL SPACE, REIMAGINED</div>
-            <h1>Clarity for your money.<br /><span>Confidence for tomorrow.</span></h1>
-            <p className="hero-text">A fresh, independent finance platform designed around a clear experience, transparent information and security-first foundations.</p>
-            <div className="hero-actions">
-              <a className="primary-button" href="#access">Explore NovoPay <ArrowRight size={18} /></a>
-              <a className="text-button" href="#features">Discover the platform</a>
-            </div>
-            <div className="trust-line"><ShieldCheck size={17} /> Built with independent infrastructure</div>
-          </div>
-          <div className="hero-art" aria-label="NovoPay finance overview illustration">
-            <div className="orb orb-one" /><div className="orb orb-two" />
-            <div className="glass-card">
-              <div className="card-top"><span className="mini-brand"><span className="mini-mark">N</span> NovoPay</span><span className="card-chip">PREVIEW</span></div>
-              <div className="card-label">Your finance overview</div>
-              <div className="preview-value">— — —</div>
-              <div className="preview-caption">Balance will appear when account services are enabled.</div>
-              <div className="chart-placeholder"><span /><span /><span /><span /><span /><span /><span /><span /><span /><span /><span /><span /></div>
-              <div className="card-bottom"><span>ACCOUNT STATUS</span><strong><i /> Setup in progress</strong></div>
-            </div>
-            <div className="floating-pill"><span className="pill-icon"><LockKeyhole size={16} /></span><span><b>Security first</b><small>Independent setup</small></span></div>
-          </div>
-        </section>
+  useEffect(() => {
+    if (!firebaseConfigured || !auth) return undefined;
+    return onAuthStateChanged(auth, (nextUser) => {
+      setUser(nextUser);
+      if (nextUser && path === "/") {
+        navigate(nextUser.email?.toLowerCase() === ADMIN_EMAIL ? "/admin" : "/dashboard");
+      }
+      if (!nextUser && ((path.startsWith("/admin") && path !== "/admin/login") || path.startsWith("/dashboard"))) {
+        navigate("/");
+      }
+    });
+  // The listener is registered once; route changes are handled by the explicit guards below.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
-        <section className="features" id="features">
-          <div className="section-heading"><span className="eyebrow">A BETTER STARTING POINT</span><h2>Designed for clarity.<br />Built for trust.</h2></div>
-          <div className="feature-grid">
-            <article className="feature-card"><span className="feature-icon blue"><WalletCards /></span><h3>A clear overview</h3><p>A focused interface with room for account details and activity when those features are ready.</p></article>
-            <article className="feature-card"><span className="feature-icon green"><ShieldCheck /></span><h3>Security by design</h3><p>Separate project configuration and secure access rules are part of the foundation.</p></article>
-            <article className="feature-card"><span className="feature-icon violet"><Globe2 /></span><h3>Independent platform</h3><p>NovoPay uses its own Firebase project and is kept separate from other production systems.</p></article>
-          </div>
-        </section>
+  async function handleSubmit(event) {
+    event.preventDefault();
+    setNotice("");
+    if (!firebaseConfigured || !auth) {
+      setNotice("Login setup abhi complete nahi hai. Firebase configuration check karein.");
+      return;
+    }
+    if (mode === "register" && email.trim().toLowerCase() === ADMIN_EMAIL) {
+      setNotice("Admin account ko public registration se create nahi kiya ja sakta. Firebase Authentication mein admin account create karein.");
+      return;
+    }
+    setBusy(true);
+    try {
+      if (mode === "register") {
+        const credential = await createUserWithEmailAndPassword(auth, email.trim(), password);
+        if (name.trim()) await updateProfile(credential.user, { displayName: name.trim() });
+        navigate("/dashboard");
+      } else {
+        const credential = await signInWithEmailAndPassword(auth, email.trim(), password);
+        if (credential.user.email?.toLowerCase() === ADMIN_EMAIL) {
+          navigate("/admin");
+        } else {
+          navigate("/dashboard");
+        }
+      }
+    } catch (error) {
+      const messages = {
+        "auth/invalid-credential": "Email ya password sahi nahi hai.",
+        "auth/user-not-found": "Is email ka account nahi mila. Pehle register karein.",
+        "auth/wrong-password": "Password sahi nahi hai.",
+        "auth/email-already-in-use": "Is email se account pehle se bana hua hai. Login karein.",
+        "auth/weak-password": "Password kam se kam 6 characters ka hona chahiye.",
+        "auth/invalid-email": "Valid email address enter karein.",
+        "auth/too-many-requests": "Bahut attempts hue hain. Thodi der baad try karein.",
+        "auth/operation-not-allowed": "Firebase Console mein Email/Password sign-in enable karein.",
+      };
+      setNotice(messages[error.code] || error.message || "Request complete nahi ho saki. Dobara try karein.");
+    } finally {
+      setBusy(false);
+    }
+  }
 
-        <section className="access-section" id="access">
-          <div className="access-copy">
-            <span className="eyebrow">EARLY PLATFORM ACCESS</span>
-            <h2>Your NovoPay journey<br />starts here.</h2>
-            <p>The starter site is being configured. Sign-in, balances, deposits and withdrawals will only be enabled after their security and backend checks are complete.</p>
-            <div className="security-note"><LockKeyhole size={18} /><span><b>Account services are not live yet.</b><small>No real transactions are processed by this starter.</small></span></div>
+  async function handleReset() {
+    setNotice("");
+    if (!firebaseConfigured || !auth) {
+      setNotice("Firebase configuration abhi complete nahi hai.");
+      return;
+    }
+    if (!email.trim()) {
+      setNotice("Password reset ke liye pehle email enter karein.");
+      return;
+    }
+    try {
+      await sendPasswordResetEmail(auth, email.trim());
+      setNotice("Agar is email ka account hai, to password reset email bhej di gayi hai.");
+    } catch (error) {
+      setNotice(error.code === "auth/invalid-email" ? "Valid email address enter karein." : "Password reset email abhi nahi bheji ja saki.");
+    }
+  }
+
+  async function handleLogout() {
+    if (auth) await signOut(auth);
+    setUser(null);
+    setMode("login");
+    setPassword("");
+    navigate("/");
+  }
+
+  if (isAdminPath || isDashboardPath) {
+    const signedIn = Boolean(user);
+    const isAdmin = user?.email?.toLowerCase() === ADMIN_EMAIL;
+    if (!signedIn) {
+      return <AuthScreen {...{ mode, setMode, name, setName, email, setEmail, password, setPassword, showPassword, setShowPassword, busy, notice, setNotice, handleSubmit, handleReset, navigate, isAdminPath }} />;
+    }
+    if (isAdminPath && !isAdmin) {
+      return (
+        <main className="np-dashboard">
+          <section className="np-dashboard-card">
+            <ShieldCheck size={36} />
+            <h1>Admin access denied</h1>
+            <p>Is account ko NovoPay admin access nahi mila hai.</p>
+            <button className="np-primary" onClick={handleLogout}>Logout</button>
+          </section>
+        </main>
+      );
+    }
+    if (isDashboardPath && isAdmin) {
+      navigate("/admin");
+      return null;
+    }
+    return (
+      <main className="np-dashboard">
+        <header className="np-dash-header">
+          <a className="np-brand" href="/" onClick={(e) => { e.preventDefault(); navigate(isAdmin ? "/admin" : "/dashboard"); }}>
+            <span className="np-brand-mark"><WalletCards size={21} /></span><span>NovoPay <b>Finance</b></span>
+          </a>
+          <button className="np-outline-button" onClick={handleLogout}>Logout</button>
+        </header>
+        <section className="np-dashboard-card">
+          <span className="np-dashboard-icon">{isAdmin ? <ShieldCheck size={30} /> : <WalletCards size={30} />}</span>
+          <p className="np-kicker">{isAdmin ? "ADMIN CONTROL" : "YOUR ACCOUNT"}</p>
+          <h1>{isAdmin ? "Admin Panel" : "Welcome to NovoPay"}</h1>
+          <p className="np-muted">Signed in as <strong>{user.email}</strong></p>
+          <div className="np-status-box">
+            <LockKeyhole size={18} />
+            <span>{isAdmin ? "Admin login successful. User management and financial operations are not enabled yet." : "Your account is active. Wallet, deposits and withdrawals are not enabled yet."}</span>
           </div>
-          <form className="access-form" onSubmit={handleContinue}>
-            <div className="form-icon"><CircleHelp size={22} /></div>
-            <h3>Get started</h3>
-            <p>Enter your email to check platform setup.</p>
-            <label htmlFor="email">Email address</label>
-            <input id="email" type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="you@example.com" required />
-            <button className="primary-button form-button" type="submit">Continue <ArrowRight size={18} /></button>
-            {notice && <p className="form-notice" role="status">{notice}</p>}
-            <p className="form-footnote">This form does not create an account or send an email yet.</p>
-          </form>
+          <p className="np-small-note">Account services will appear here after backend security and transaction checks are completed.</p>
         </section>
       </main>
+    );
+  }
 
-      <footer id="help">
-        <a className="brand footer-brand" href="#"><span className="brand-mark"><WalletCards size={20} /></span><span>NovoPay <b>Finance</b></span></a>
-        <span className="footer-copy">Independent project · Setup in progress</span>
-        <span className="footer-security"><ShieldCheck size={15} /> Security-first foundation</span>
-      </footer>
-    </div>
+  return <AuthScreen {...{ mode, setMode, name, setName, email, setEmail, password, setPassword, showPassword, setShowPassword, busy, notice, setNotice, handleSubmit, handleReset, navigate, isAdminPath }} />;
+}
+
+function AuthScreen({ mode, setMode, name, setName, email, setEmail, password, setPassword, showPassword, setShowPassword, busy, notice, setNotice, handleSubmit, handleReset, navigate, isAdminPath }) {
+  const adminLogin = Boolean(isAdminPath);
+  return (
+    <main className="np-auth-page">
+      <div className="np-auth-glow np-glow-one" />
+      <div className="np-auth-glow np-glow-two" />
+      <section className="np-auth-layout">
+        <div className="np-auth-intro">
+          <a className="np-brand" href="/" onClick={(e) => { e.preventDefault(); navigate("/"); }}>
+            <span className="np-brand-mark"><WalletCards size={23} /></span><span>NovoPay <b>Finance</b></span>
+          </a>
+          <div className="np-intro-copy">
+            <span className="np-kicker"><span className="np-live-dot" /> SECURE ACCOUNT ACCESS</span>
+            <h1>{adminLogin ? "Admin access." : "Welcome back."}<br /><span>{adminLogin ? "Control NovoPay." : "Your finance space."}</span></h1>
+            <p>{adminLogin ? "Sign in with the authorized NovoPay administrator account to access the admin area." : "Sign in to your account or create one to get started with NovoPay Finance."}</p>
+            <div className="np-trust"><ShieldCheck size={18} /><span>Secure sign-in powered by Firebase Authentication</span></div>
+          </div>
+        </div>
+        <section className="np-auth-card">
+          <div className="np-card-icon"><LockKeyhole size={22} /></div>
+          <h2>{adminLogin ? "Admin Login" : mode === "register" ? "Create your account" : "Sign in to NovoPay"}</h2>
+          <p className="np-card-subtitle">{adminLogin ? "Authorized administrators only" : mode === "register" ? "Enter your details to register" : "Enter your credentials to continue"}</p>
+          {!adminLogin && (
+            <div className="np-auth-tabs">
+              <button className={mode === "login" ? "active" : ""} onClick={() => { setMode("login"); setNotice(""); }}>Login</button>
+              <button className={mode === "register" ? "active" : ""} onClick={() => { setMode("register"); setNotice(""); }}>Register</button>
+            </div>
+          )}
+          <form onSubmit={handleSubmit}>
+            {mode === "register" && !adminLogin && (
+              <label className="np-field"><span>Full name</span><input value={name} onChange={(e) => setName(e.target.value)} placeholder="Enter your full name" autoComplete="name" required /></label>
+            )}
+            <label className="np-field"><span>Email address</span><input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@example.com" autoComplete="email" required /></label>
+            <label className="np-field"><span>Password</span><span className="np-password-wrap"><input type={showPassword ? "text" : "password"} value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Enter your password" autoComplete={mode === "register" ? "new-password" : "current-password"} minLength={6} required /><button type="button" aria-label={showPassword ? "Hide password" : "Show password"} onClick={() => setShowPassword(!showPassword)}>{showPassword ? <EyeOff size={18} /> : <Eye size={18} />}</button></span></label>
+            {mode === "login" && !adminLogin && <button type="button" className="np-forgot" onClick={handleReset}>Forgot password?</button>}
+            <button className="np-primary np-submit" type="submit" disabled={busy}>{busy ? "Please wait…" : mode === "register" && !adminLogin ? "Create account" : "Login"} <ArrowRight size={17} /></button>
+          </form>
+          {notice && <p className="np-notice" role="status">{notice}</p>}
+          {!firebaseConfigured && <p className="np-notice">Firebase setup pending: required VITE_FIREBASE environment variables configure karein.</p>}
+          {adminLogin && <button className="np-back-link" onClick={() => { setMode("login"); navigate("/"); }}>← Back to user login</button>}
+          {!adminLogin && <><p className="np-legal">By continuing, you agree to use NovoPay responsibly. Account and financial services are not enabled yet.</p><button type="button" className="np-admin-link" onClick={() => { setMode("login"); navigate("/admin/login"); }}>Admin login</button></>}
+        </section>
+      </section>
+      <footer className="np-auth-footer"><span>© NovoPay Finance</span><span><LockKeyhole size={14} /> Protected account access</span></footer>
+    </main>
   );
 }
