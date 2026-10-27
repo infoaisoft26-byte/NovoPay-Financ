@@ -68,8 +68,27 @@ export default function UserDashboard({ user, onLogout }) {
         headers: { Authorization: `Bearer ${token}` },
         cache: "no-store",
       });
-      const result = await response.json().catch(() => ({}));
+      let result = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(result.error || "Account data could not be loaded.");
+      if (result.profilePending && section !== "packages") {
+        const createProfile = await fetch("/api/user", {
+          method: "POST",
+          headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+          body: JSON.stringify({ action: "ensure-profile", full_name: user.displayName || "" }),
+          cache: "no-store",
+        });
+        const profileResult = await createProfile.json().catch(() => ({}));
+        if (!createProfile.ok) throw new Error(profileResult.error || "Your account profile could not be initialized.");
+        result = { ...result, user: profileResult.user, profilePending: false };
+        if (section === "overview") {
+          const refreshed = await fetch(`/api/user?section=overview&limit=50`, {
+            headers: { Authorization: `Bearer ${token}` },
+            cache: "no-store",
+          });
+          const refreshedResult = await refreshed.json().catch(() => ({}));
+          if (refreshed.ok) result = refreshedResult;
+        }
+      }
       setData(result);
       setLastUpdated(new Date());
     } catch (err) {
