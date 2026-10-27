@@ -14,6 +14,11 @@ function services() {
   }
   if (!adminAuth) {
     const serviceAccount = JSON.parse(serviceAccountJson);
+    if (serviceAccount.project_id !== "novopay-finance") {
+      const error = new Error("NovoPay Firebase service account must belong to the novopay-finance project.");
+      error.status = 503;
+      throw error;
+    }
     const app = getApps()[0] || initializeApp({ credential: cert(serviceAccount) });
     adminAuth = getAuth(app);
   }
