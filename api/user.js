@@ -127,7 +127,8 @@ export default async function handler(req, res) {
   } catch (error) {
     const status = error?.status || 500;
     if (status === 503 || status === 401) return res.status(status).json({ error: error.message });
-    // Never send internal database or credential details to the browser.
+    // Log a safe diagnostic on the server; never expose database or credential details to the browser.
+    console.error("[NovoPay API] /api/user failed", { name: error?.name, message: error?.message, code: error?.code, status, section: req.query?.section || "overview" });
     return res.status(status === 403 ? 403 : 500).json({ error: status === 403 ? error.message : "NovoPay account data could not be loaded." });
   }
 }
