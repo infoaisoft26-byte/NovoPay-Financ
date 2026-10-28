@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import {
   createUserWithEmailAndPassword,
+  deleteUser,
   onAuthStateChanged,
   sendPasswordResetEmail,
   signInWithEmailAndPassword,
@@ -19,6 +20,7 @@ export default function App() {
   const [mode, setMode] = useState("login");
   const [user, setUser] = useState(null);
   const [name, setName] = useState("");
+  const [sponsorCode, setSponsorCode] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -33,6 +35,14 @@ export default function App() {
     setPath(nextPath);
     setNotice("");
   }
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const referral = params.get("ref") || "";
+    if (window.location.pathname === "/register" || referral) setMode("register");
+    if (window.location.pathname === "/login") setMode("login");
+    if (referral) setSponsorCode(referral.trim().toUpperCase());
+  }, []);
 
   useEffect(() => {
     const handlePopState = () => setPath(window.location.pathname);
@@ -69,8 +79,19 @@ export default function App() {
     setBusy(true);
     try {
       if (mode === "register") {
+        const code = sponsorCode.trim().toUpperCase();
+        if (!code) throw new Error("Sponsor ID is required to register.");
+        const validationResponse = await fetch("/api/referral-check?code=" + encodeURIComponent(code), { cache: "no-store" });
+        const validation = await validationResponse.json().catch(() => ({}));
+        if (!validationResponse.ok || !validation.valid) throw new Error(validation.error || "Sponsor ID is invalid or inactive.");
         const credential = await createUserWithEmailAndPassword(auth, email.trim(), password);
-        if (name.trim()) await updateProfile(credential.user, { displayName: name.trim() });
+        try {
+          if (name.trim()) await updateProfile(credential.user, { displayName: name.trim() });
+          const token = await credential.user.getIdToken();
+          const profileResponse = await fetch("/api/user", { method: "POST", headers: { Authorization: "Bearer " + token, "Content-Type": "application/json" }, body: JSON.stringify({ action: "ensure-profile", full_name: name.trim(), sponsor_code: code }), cache: "no-store" });
+          const profileResult = await profileResponse.json().catch(() => ({}));
+          if (!profileResponse.ok) throw new Error(profileResult.error || "Registration profile could not be created.");
+        } catch (profileError) { await deleteUser(credential.user).catch(() => {}); throw profileError; }
         navigate("/dashboard");
       } else {
         const credential = await signInWithEmailAndPassword(auth, email.trim(), password);
@@ -204,7 +225,10 @@ function AuthScreen({ mode, setMode, name, setName, email, setEmail, password, s
           )}
           <form onSubmit={handleSubmit}>
             {mode === "register" && !adminLogin && (
-              <label className="np-field"><span>Full name</span><input value={name} onChange={(e) => setName(e.target.value)} placeholder="Enter your full name" autoComplete="name" required /></label>
+              <>
+                <label className="np-field"><span>Full name</span><input value={name} onChange={(e) => setName(e.target.value)} placeholder="Enter your full name" autoComplete="name" required /></label>
+                <label className="np-field"><span>Sponsor / Referral ID</span><input value={sponsorCode} onChange={(e) => setSponsorCode(e.target.value.toUpperCase())} placeholder="Enter sponsor ID" autoComplete="off" required /></label>
+              </>
             )}
             <label className="np-field"><span>Email address</span><input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@example.com" autoComplete="email" required /></label>
             <label className="np-field"><span>Password</span><span className="np-password-wrap"><input type={showPassword ? "text" : "password"} value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Enter your password" autoComplete={mode === "register" ? "new-password" : "current-password"} minLength={6} required /><button type="button" aria-label={showPassword ? "Hide password" : "Show password"} onClick={() => setShowPassword(!showPassword)}>{showPassword ? <EyeOff size={18} /> : <Eye size={18} />}</button></span></label>
