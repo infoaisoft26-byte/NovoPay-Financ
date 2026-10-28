@@ -41,3 +41,11 @@
 .np-user-action-form button:disabled{opacity:.55;cursor:wait}
 .np-user-action-form p[role=status]{grid-column:1/-1;margin:0;padding:10px 12px;border-radius:9px;background:rgba(201,154,53,.12);color:var(--np-text,#e8edf7);overflow-wrap:anywhere}
 @media(max-width:640px){.np-user-action-form{grid-template-columns:minmax(0,1fr);padding:13px}.np-user-action-form p[role=status]{grid-column:auto}}
+
+.np-user-referrals{display:grid;gap:18px}
+.np-user-referral-card{padding:22px}
+.np-user-referral-code{font-size:clamp(20px,3vw,30px);font-weight:800;letter-spacing:.04em;color:#e9c46a;overflow-wrap:anywhere;margin:16px 0 10px}
+.np-user-referral-link{padding:12px 14px;border:1px solid var(--np-border,#364158);border-radius:10px;background:var(--np-input,#0c1220);color:var(--np-text,#e8edf7);overflow-wrap:anywhere;font-size:13px}
+.np-user-referral-copy{display:inline-flex;align-items:center;justify-content:center;gap:8px;margin-top:12px;min-height:40px;padding:10px 14px;border:0;border-radius:10px;background:linear-gradient(120deg,#c99a35,#f1d58b);color:#17130b;font-weight:750;cursor:pointer}
+.np-user-referral-copy:disabled{opacity:.55;cursor:wait}
+.np-user-referral-message{margin:10px 0 0;color:var(--np-text,#e8edf7);font-size:13px}
