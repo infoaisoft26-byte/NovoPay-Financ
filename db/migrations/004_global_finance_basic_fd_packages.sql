@@ -1,6 +1,7 @@
--- NovoPay Finance: seed Global Finance Basic + FD package catalog.
--- Apply only to the dedicated NovoPay Neon database. This does not copy users, balances, activations, or credentials.
--- Configured returns are estimates, not guaranteed investment returns. Purchases/credits remain disabled pending secure server-side transaction handling.
+-- NovoPay Finance only: seed the exact Global Finance Basic and FD package templates.
+-- Safe to re-run: existing package rows are updated by unique name; other NovoPay data is untouched.
+-- This copies package definitions only, not users, balances, activations, or credentials.
+-- Configured return terms are estimates, not guaranteed returns.
 
 ALTER TABLE packages ADD COLUMN IF NOT EXISTS package_type TEXT NOT NULL DEFAULT 'basic';
 ALTER TABLE packages ADD COLUMN IF NOT EXISTS package_code TEXT;
@@ -15,19 +16,19 @@ WITH basic(amount, rate, days, n) AS (
     (2::numeric,5::numeric,25,1),(5,5,25,2),(10,1,25,3),(20,5,25,4),(25,5,25,5),
     (10000,1,25,6),(20000,1,25,7),(50000,1,25,8),(100000,1,25,9),(200000,1,25,10),(500000,1,25,11)
 ), rows AS (
-  SELECT 'GF Base Plan ' || n AS name, amount AS price, 'basic'::text AS package_type,
+  SELECT 'Base Plan ' || n AS name, amount AS price, 'basic'::text AS package_type,
     'GF_BASE_' || lpad(n::text,2,'0') AS package_code, rate AS roi_rate, days AS duration_days,
-    'Global Finance Basic/Base plan template. Configured daily rate ' || rate || '% for ' || days || ' days. Scheduled returns are estimates, not guarantees.' AS description
+    'Fixed ' || to_char(amount, 'FM999,999,999,990.##') || ' USDT plan. Configured daily return: ' || rate || '% for ' || days || ' days. Returns are estimates, not guarantees.' AS description
   FROM basic
   UNION ALL
-  SELECT 'GF Base FD Plan ' || n, amount, 'fd',
+  SELECT 'Base FD Plan ' || n, amount, 'fd',
     'GF_FD_BASE_' || lpad(n::text,2,'0'), 1::numeric, 365,
-    'Global Finance Base FD template. Configured daily rate 1% for 365 days. Maturity estimate includes principal plus scheduled return; not guaranteed.'
+    'Fixed ' || to_char(amount, 'FM999,999,999,990.##') || ' USDT FD plan for 365 days. Configured daily rate: 1%. Returns are estimates, not guarantees.'
   FROM (VALUES (1000::numeric,1),(2000,2),(5000,3),(10000,4),(20000,5),(50000,6),(100000,7),(200000,8),(500000,9)) x(amount,n)
   UNION ALL
-  SELECT 'GF Prime FD Plan ' || n, amount, 'fd',
+  SELECT 'Prime FD Plan ' || n, amount, 'fd',
     'GF_FD_PRIME_' || lpad(n::text,2,'0'), 1.5::numeric, 515,
-    'Global Finance Prime FD template. Configured daily rate 1.5% for 515 days. Maturity estimate includes principal plus scheduled return; not guaranteed.'
+    'Fixed ' || to_char(amount, 'FM999,999,999,990.##') || ' USDT Prime FD plan for 515 days. Configured daily rate: 1.5%. Returns are estimates, not guarantees.'
   FROM (VALUES (1000::numeric,1),(2000,2),(5000,3),(10000,4),(20000,5),(50000,6),(100000,7),(200000,8),(500000,9)) x(amount,n)
 )
 INSERT INTO packages (name, price, currency, status, description, package_type, package_code, roi_rate, duration_days)
