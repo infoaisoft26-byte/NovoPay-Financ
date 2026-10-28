@@ -78,6 +78,7 @@ const sectionSlugs = {
   Withdrawals: "withdrawals", Transactions: "transactions", "P2P Transfers": "p2p",
   Packages: "packages", "Package Activations": "activations", "Support Tickets": "support",
   "Website Feedback": "feedback", "Survey Responses": "surveys", "Audit Logs": "audit", "Offer Posters": "posters",
+  Reports: "reports", "Income Leaderboard": "leaderboard", Settings: "settings",
 };
 
 function recordCells(section, row) {
@@ -96,6 +97,9 @@ function recordCells(section, row) {
     case "Survey Responses": return [row.id, row.survey_key, JSON.stringify(row.response)];
     case "Audit Logs": return [row.id, row.actor_uid, row.action + " · " + (row.entity_type || "") + " · " + (row.entity_id || "")];
     case "Offer Posters": return [row.title, row.status, row.image_url];
+    case "Reports": return [row.name, row.status, row.details];
+    case "Income Leaderboard": return [row.novopay_id + " · " + (row.full_name || ""), String(row.total_investment || "0") + " USDT", "Sponsor: " + (row.sponsor_user_id || "—") + " · Direct: " + row.direct_members];
+    case "Settings": return [row.name, row.status, row.details];
     default: return [row.id || "—", row.status || "—", "—"];
   }
 }
@@ -127,6 +131,7 @@ export default function AdminPanel({ user, onLogout }) {
   const [notice, setNotice] = useState("");
   const [rows, setRows] = useState([]);
   const [overviewCounts, setOverviewCounts] = useState(null);
+  const [recentActivity, setRecentActivity] = useState([]);
   const [dataError, setDataError] = useState("");
   const [loadingData, setLoadingData] = useState(false);
   const [settingUpAdmin, setSettingUpAdmin] = useState(false);
@@ -172,14 +177,21 @@ export default function AdminPanel({ user, onLogout }) {
           throw new Error(payload.error || "Admin data could not be loaded.");
         }
         if (cancelled) return;
-        if (section === "Overview") setOverviewCounts(payload.counts || null);
-        else setRows(Array.isArray(payload.rows) ? payload.rows : []);
+        if (section === "Overview") {
+          setOverviewCounts(payload.counts || null);
+          setRecentActivity(Array.isArray(payload.recentActivity) ? payload.recentActivity : []);
+        } else setRows(Array.isArray(payload.rows) ? payload.rows : []);
       } catch (error) {
-        if (!cancelled) { setRows([]); setOverviewCounts(null); setDataError(error.message || "Admin data could not be loaded."); }
+        if (!cancelled) { setRows([]); setOverviewCounts(null); setRecentActivity([]); setDataError(error.message || "Admin data could not be loaded."); }
       } finally { if (!cancelled) setLoadingData(false); }
     }, query ? 250 : 0);
     return () => { cancelled = true; window.clearTimeout(timer); };
   }, [section, query, reloadKey, user]);
+
+  useEffect(() => {
+    const interval = window.setInterval(() => setReloadKey(value => value + 1), 15000);
+    return () => window.clearInterval(interval);
+  }, []);
 
   const quickLinks = [
     { label: "Manage users", desc: "Accounts and wallet summaries", icon: Users, target: "Users" },
@@ -257,8 +269,8 @@ export default function AdminPanel({ user, onLogout }) {
             </div>
             <div className="np-admin-overview-grid">
               <section className="np-admin-panel np-admin-activity-panel">
-                <div className="np-admin-panel-heading"><div><h3>Recent activity</h3><p>Latest events from NovoPay records</p></div><span className="np-admin-live-label"><span/> Awaiting data</span></div>
-                <div className="np-admin-empty"><span className="np-admin-empty-icon"><ReceiptText size={22}/></span><b>No activity connected yet</b><p>Connect the independent NovoPay event ledger before showing transactions or administrative events. No sample financial activity is invented.</p></div>
+                <div className="np-admin-panel-heading"><div><h3>Recent activity</h3><p>Latest events from NovoPay records</p></div><span className="np-admin-live-label"><span/> Auto-refresh · 15 sec</span></div>
+                {recentActivity.length ? <div className="np-admin-record-list">{recentActivity.map((item, index) => <div className="np-admin-record-row" key={item.id || item.reference || index}><span>{item.reference || item.type || "Ledger event"}</span><span>{item.type} · {item.status}</span><span>{item.user_id} · {item.amount} {item.currency} · {item.created_at ? new Date(item.created_at).toLocaleString() : "—"}</span></div>)}</div> : <div className="np-admin-empty"><span className="np-admin-empty-icon"><ReceiptText size={22}/></span><b>{dataError ? "Activity unavailable" : "No ledger activity yet"}</b><p>{dataError || "New verified ledger entries will appear here automatically. No sample financial activity is invented."}</p></div>}
               </section>
               <section className="np-admin-panel np-admin-quick-panel">
                 <div className="np-admin-panel-heading"><div><h3>Quick access</h3><p>Open a control module</p></div></div>
