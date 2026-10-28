@@ -43,7 +43,7 @@ function getServices() {
   if (!rawServiceAccount || !databaseUrl) {
     throw configurationError("NovoPay admin backend is not configured. Check production server environment variables.");
   }
-  if (!/^postgres(?:ql)?:\\/\\//i.test(databaseUrl)) {
+  if (!/^postgres(?:ql)?:\/\//i.test(databaseUrl)) {
     throw configurationError("NovoPay DATABASE_URL is not a valid PostgreSQL URL.");
   }
   if (!adminAuth) {
