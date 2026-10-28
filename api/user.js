@@ -53,6 +53,7 @@ const queries = {
   withdrawals: (db, id, q, limit) => db`SELECT id, reference, amount, fee, net_amount, currency, status, payout_reference, created_at, reviewed_at FROM withdrawals WHERE user_id = ${id} AND (COALESCE(reference, '') ILIKE ${q} OR COALESCE(payout_reference, '') ILIKE ${q}) ORDER BY created_at DESC LIMIT ${limit}`,
   transactions: (db, id, q, limit) => db`SELECT id, reference, type, amount, currency, status, description, created_at FROM ledger_transactions WHERE user_id = ${id} AND (COALESCE(reference, '') ILIKE ${q} OR COALESCE(type, '') ILIKE ${q} OR COALESCE(description, '') ILIKE ${q}) ORDER BY created_at DESC LIMIT ${limit}`,
   packages: (db, _id, q, limit) => db`SELECT id, name, price, currency, status, description, created_at FROM packages WHERE status = 'active' AND (COALESCE(name, '') ILIKE ${q} OR COALESCE(description, '') ILIKE ${q}) ORDER BY price ASC LIMIT ${limit}`,
+  activations: (db, id, q, limit) => db`SELECT a.id, a.reference, a.user_id, a.amount, a.currency, a.status, a.activated_at, a.created_at, p.name AS package_name FROM package_activations a LEFT JOIN packages p ON p.id = a.package_id WHERE a.user_id = ${id} AND (COALESCE(a.reference, '') ILIKE ${q} OR COALESCE(p.name, '') ILIKE ${q}) ORDER BY a.created_at DESC LIMIT ${limit}`,
   p2p: (db, id, q, limit) => db`SELECT id, reference, sender_user_id, receiver_user_id, amount, currency, status, created_at FROM p2p_transfers WHERE (sender_user_id = ${id} OR receiver_user_id = ${id}) AND (COALESCE(reference, '') ILIKE ${q} OR COALESCE(sender_user_id, '') ILIKE ${q} OR COALESCE(receiver_user_id, '') ILIKE ${q}) ORDER BY created_at DESC LIMIT ${limit}`,
   support: (db, id, q, limit) => db`SELECT id, reference, subject, status, created_at, updated_at FROM support_tickets WHERE user_id = ${id} AND (COALESCE(reference, '') ILIKE ${q} OR COALESCE(subject, '') ILIKE ${q}) ORDER BY created_at DESC LIMIT ${limit}`,
 };
@@ -100,14 +101,15 @@ export default async function handler(req, res) {
     }
 
     if (section === "overview") {
-      const [recentTransactions, pendingDeposits, pendingWithdrawals] = await Promise.all([
+      const [recentTransactions, pendingDeposits, pendingWithdrawals, activePackages] = await Promise.all([
         db`SELECT id, reference, type, amount, currency, status, description, created_at FROM ledger_transactions WHERE user_id = ${profile.novopay_id} ORDER BY created_at DESC LIMIT 5`,
         db`SELECT count(*)::int AS count FROM deposits WHERE user_id = ${profile.novopay_id} AND status = 'pending'`,
         db`SELECT count(*)::int AS count FROM withdrawals WHERE user_id = ${profile.novopay_id} AND status = 'pending'`,
+        db`SELECT count(*)::int AS count FROM package_activations WHERE user_id = ${profile.novopay_id} AND status = 'active'`,
       ]);
       return res.status(200).json({
         ok: true, section, user: profile, rows: recentTransactions, recentTransactions,
-        summary: { pendingDeposits: pendingDeposits[0]?.count ?? 0, pendingWithdrawals: pendingWithdrawals[0]?.count ?? 0 },
+        summary: { pendingDeposits: pendingDeposits[0]?.count ?? 0, pendingWithdrawals: pendingWithdrawals[0]?.count ?? 0, activePackages: activePackages[0]?.count ?? 0 },
       });
     }
     if (section === "wallet") {
@@ -117,6 +119,10 @@ export default async function handler(req, res) {
     const query = queries[section];
     if (!query) return res.status(400).json({ error: "Unknown account section." });
     const rows = await query(db, profile.novopay_id, pattern, limit);
+    if (section === "packages") {
+      const activations = await queries.activations(db, profile.novopay_id, pattern, limit);
+      return res.status(200).json({ ok: true, section, user: profile, rows, activations });
+    }
     return res.status(200).json({ ok: true, section, user: profile, rows });
   } catch (error) {
     const status = error?.status || 500;
