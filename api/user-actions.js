@@ -28,7 +28,7 @@ async function userFor(req, auth, sql) {
 }
 function positiveAmount(value) {
   const n = Number(value);
-  if (!Number.isFinite(n) || n <= 0 || n > 100000000 || !/^\\d+(?:\\.\\d{1,8})?$/.test(String(value))) fail("Enter a valid amount greater than zero (up to 8 decimal places).");
+  if (!Number.isFinite(n) || n <= 0 || n > 100000000 || !/^\d+(?:\.\d{1,8})?$/.test(String(value))) fail("Enter a valid amount greater than zero (up to 8 decimal places).");
   return n.toFixed(8);
 }
 export default async function handler(req, res) {
