@@ -70,7 +70,7 @@ export default async function handler(req, res) {
         WHERE novopay_id = ${profile.novopay_id} AND fund_balance >= ${amount}::numeric
         RETURNING novopay_id
       ), created AS (
-        INSERT INTO withdrawals (reference, user_id, amount, fee, net_amount, currency, status, payout_reference)
+        INSERT INTO withdrawals (reference, user_id, amount, fee, net_amount, currency, status, payout_address)
         SELECT ${reference}, novopay_id, ${amount}, ${fee}, ${net}, 'USDT', 'pending', ${address} FROM debited
         RETURNING reference, amount, fee, net_amount, status, created_at, user_id
       ), ledger AS (
