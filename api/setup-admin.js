@@ -8,13 +8,26 @@ function getAdminAuth() {
     error.status = 503;
     throw error;
   }
-  const serviceAccount = JSON.parse(serviceAccountJson);
-  if (serviceAccount.project_id !== "novopay-finance") {
+  let serviceAccount;
+  try {
+    serviceAccount = JSON.parse(serviceAccountJson);
+  } catch {
+    try { serviceAccount = JSON.parse(Buffer.from(serviceAccountJson, "base64").toString("utf8")); }
+    catch {
+      const error = new Error("NovoPay Firebase service account is not valid JSON.");
+      error.status = 503;
+      throw error;
+    }
+  }
+  if (typeof serviceAccount === "string") serviceAccount = JSON.parse(serviceAccount);
+  if (serviceAccount.project_id !== "novopay-finance" || !serviceAccount.client_email || !serviceAccount.private_key) {
     const error = new Error("Firebase service account must belong to the novopay-finance project.");
     error.status = 503;
     throw error;
   }
-  const app = getApps()[0] || initializeApp({ credential: cert(serviceAccount) });
+  serviceAccount.private_key = String(serviceAccount.private_key).replace(/\\n/g, "\n");
+  const appName = "novopay-admin-setup";
+  const app = getApps().find((item) => item.name === appName) || initializeApp({ credential: cert(serviceAccount), projectId: "novopay-finance" }, appName);
   return getAuth(app);
 }
 
