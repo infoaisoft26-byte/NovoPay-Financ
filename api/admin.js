@@ -71,6 +71,22 @@ const sectionQueries = {
   surveys: (sql, q, limit) => sql`SELECT id, user_id, survey_key, response, created_at FROM survey_responses WHERE (COALESCE(user_id, '') ILIKE ${q} OR COALESCE(survey_key, '') ILIKE ${q}) ORDER BY created_at DESC LIMIT ${limit}`,
   audit: (sql, q, limit) => sql`SELECT id, actor_uid, action, entity_type, entity_id, details, created_at FROM audit_logs WHERE (COALESCE(actor_uid, '') ILIKE ${q} OR COALESCE(action, '') ILIKE ${q} OR COALESCE(entity_id, '') ILIKE ${q}) ORDER BY created_at DESC LIMIT ${limit}`,
   posters: (sql, q, limit) => sql`SELECT id, title, image_url, status, starts_at, ends_at, created_at FROM offer_posters WHERE COALESCE(title, '') ILIKE ${q} ORDER BY created_at DESC LIMIT ${limit}`,
+  reports: (sql) => sql`SELECT 'Registered users' AS name, 'live' AS status, count(*)::text || ' accounts' AS details FROM users
+    UNION ALL SELECT 'Active package investment', 'live', COALESCE(to_char(sum(amount), 'FM999999990.00'), '0.00') || ' USDT' FROM package_activations WHERE status = 'active'
+    UNION ALL SELECT 'Ledger transactions', 'live', count(*)::text || ' entries' FROM ledger_transactions
+    UNION ALL SELECT 'Pending deposits', 'review', count(*)::text || ' requests' FROM deposits WHERE status = 'pending'
+    UNION ALL SELECT 'Pending withdrawals', 'review', count(*)::text || ' requests' FROM withdrawals WHERE status = 'pending'
+    UNION ALL SELECT 'Open support tickets', 'review', count(*)::text || ' tickets' FROM support_tickets WHERE status IN ('open', 'pending')`,
+  leaderboard: (sql, q, limit) => sql`SELECT u.novopay_id, u.full_name, u.sponsor_user_id,
+      COALESCE(sum(a.amount) FILTER (WHERE a.status = 'active'), 0)::numeric(20,8) AS total_investment,
+      (SELECT count(*)::int FROM users child WHERE child.sponsor_user_id = u.novopay_id) AS direct_members
+    FROM users u LEFT JOIN package_activations a ON a.user_id = u.novopay_id
+    WHERE (COALESCE(u.novopay_id, '') ILIKE ${q} OR COALESCE(u.full_name, '') ILIKE ${q})
+    GROUP BY u.novopay_id, u.full_name, u.sponsor_user_id
+    ORDER BY total_investment DESC, u.created_at ASC LIMIT ${limit}`,
+  settings: (sql) => sql`SELECT 'Database connection' AS name, 'connected' AS status, 'Live NovoPay database queries are responding' AS details
+    UNION ALL SELECT 'Package catalog', CASE WHEN count(*) FILTER (WHERE status = 'active') > 0 THEN 'active' ELSE 'needs setup' END, count(*) FILTER (WHERE status = 'active')::text || ' active packages' FROM packages
+    UNION ALL SELECT 'Admin authorization', 'protected', 'Firebase verified ID token and admin claim required'`,
 };
 
 export default async function handler(req, res) {
@@ -99,15 +115,18 @@ export default async function handler(req, res) {
 
     const section = String(req.query?.section || "overview").toLowerCase();
     if (section === "overview") {
-      const counts = await Promise.all([
-        db`SELECT count(*)::int AS count FROM users`,
-        db`SELECT count(*)::int AS count FROM deposits WHERE status = 'pending'`,
-        db`SELECT count(*)::int AS count FROM withdrawals WHERE status = 'pending'`,
-        db`SELECT count(*)::int AS count FROM ledger_transactions`,
-        db`SELECT count(*)::int AS count FROM kyc_submissions WHERE status = 'pending'`,
-        db`SELECT count(*)::int AS count FROM packages WHERE status = 'active'`,
-        db`SELECT count(*)::int AS count FROM support_tickets WHERE status IN ('open', 'pending')`,
-        db`SELECT count(*)::int AS count FROM audit_logs`,
+      const [counts, recentActivity] = await Promise.all([
+        Promise.all([
+          db`SELECT count(*)::int AS count FROM users`,
+          db`SELECT count(*)::int AS count FROM deposits WHERE status = 'pending'`,
+          db`SELECT count(*)::int AS count FROM withdrawals WHERE status = 'pending'`,
+          db`SELECT count(*)::int AS count FROM ledger_transactions`,
+          db`SELECT count(*)::int AS count FROM kyc_submissions WHERE status = 'pending'`,
+          db`SELECT count(*)::int AS count FROM packages WHERE status = 'active'`,
+          db`SELECT count(*)::int AS count FROM support_tickets WHERE status IN ('open', 'pending')`,
+          db`SELECT count(*)::int AS count FROM audit_logs`,
+        ]),
+        db`SELECT id, reference, user_id, type, amount, currency, status, description, created_at FROM ledger_transactions ORDER BY created_at DESC LIMIT 8`,
       ]);
       return res.status(200).json({
         ok: true,
@@ -122,6 +141,7 @@ export default async function handler(req, res) {
           openTickets: counts[6][0].count,
           auditEvents: counts[7][0].count,
         },
+        recentActivity,
       });
     }
 
