@@ -2,22 +2,58 @@ import { cert, getApps, initializeApp } from "firebase-admin/app";
 import { getAuth } from "firebase-admin/auth";
 import { neon } from "@neondatabase/serverless";
 
-const serviceAccountJson = process.env.FIREBASE_SERVICE_ACCOUNT_JSON;
 let adminAuth = null;
 let db = null;
 
+function configurationError(message) {
+  const error = new Error(message);
+  error.status = 503;
+  return error;
+}
+
+function parseServiceAccount(rawValue) {
+  const value = String(rawValue || "").trim();
+  if (!value) throw configurationError("NovoPay Firebase server credentials are missing.");
+  let serviceAccount;
+  try {
+    serviceAccount = JSON.parse(value);
+  } catch {
+    try {
+      serviceAccount = JSON.parse(Buffer.from(value, "base64").toString("utf8"));
+    } catch {
+      throw configurationError("NovoPay Firebase server credentials are not valid JSON.");
+    }
+  }
+  if (typeof serviceAccount === "string") {
+    try { serviceAccount = JSON.parse(serviceAccount); }
+    catch { throw configurationError("NovoPay Firebase server credentials are not valid JSON."); }
+  }
+  if (!serviceAccount || typeof serviceAccount !== "object" ||
+      serviceAccount.project_id !== "novopay-finance" ||
+      !serviceAccount.client_email || !serviceAccount.private_key) {
+    throw configurationError("NovoPay Firebase credentials must be a complete service account for novopay-finance.");
+  }
+  serviceAccount.private_key = String(serviceAccount.private_key).replace(/\\n/g, "\n");
+  return serviceAccount;
+}
+
 function getServices() {
-  if (!serviceAccountJson || !process.env.DATABASE_URL) {
-    const error = new Error("NovoPay admin backend is not configured.");
-    error.status = 503;
-    throw error;
+  const rawServiceAccount = process.env.FIREBASE_SERVICE_ACCOUNT_JSON;
+  const databaseUrl = String(process.env.DATABASE_URL || "").trim();
+  if (!rawServiceAccount || !databaseUrl) {
+    throw configurationError("NovoPay admin backend is not configured. Check production server environment variables.");
+  }
+  if (!/^postgres(?:ql)?:\\/\\//i.test(databaseUrl)) {
+    throw configurationError("NovoPay DATABASE_URL is not a valid PostgreSQL URL.");
   }
   if (!adminAuth) {
-    const serviceAccount = JSON.parse(serviceAccountJson);
-    const app = getApps()[0] || initializeApp({ credential: cert(serviceAccount) });
+    const serviceAccount = parseServiceAccount(rawServiceAccount);
+    const appName = "novopay-admin-api";
+    const app = getApps().find((item) => item.name === appName) ||
+      initializeApp({ credential: cert(serviceAccount), projectId: "novopay-finance" }, appName);
     adminAuth = getAuth(app);
   }
-  if (!db) db = neon(process.env.DATABASE_URL);
+  if (!db) db = neon(databaseUrl);
   return { adminAuth, db };
 }
 
@@ -99,8 +135,15 @@ export default async function handler(req, res) {
     return res.status(200).json({ ok: true, section, rows });
   } catch (error) {
     const status = error?.status || 500;
+    // Safe server-side diagnostics only; never expose SQL or credentials to the browser.
+    console.error("[NovoPay API] /api/admin failed", {
+      name: error?.name,
+      message: error?.message,
+      code: error?.code,
+      status,
+      section: req.query?.section || "overview"
+    });
     if (status === 503) return res.status(503).json({ error: error.message });
-    // Keep internal database/service details out of API responses.
     return res.status(500).json({ error: "Admin data could not be loaded." });
   }
 }
