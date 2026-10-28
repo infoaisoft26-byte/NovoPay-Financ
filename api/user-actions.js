@@ -45,8 +45,17 @@ export default async function handler(req, res) {
     if (action === "deposit-request") {
       const txHash = String(req.body?.tx_hash || "").trim();
       if (!/^(0x)?[a-fA-F0-9]{64}$/.test(txHash)) fail("Enter a valid BSC transaction hash.");
-      const rows = await sql`INSERT INTO deposits (reference, user_id, amount, currency, status, tx_hash) VALUES (${reference}, ${profile.novopay_id}, ${amount}, 'USDT', 'pending', ${txHash.startsWith("0x") ? txHash : "0x" + txHash}) RETURNING reference, amount, status, tx_hash, created_at`;
-      await sql`INSERT INTO audit_logs (actor_uid, action, entity_type, entity_id, details) VALUES (${decoded.uid}, 'deposit_requested', 'deposit', ${reference}, jsonb_build_object('amount', ${amount}::numeric, 'currency', 'USDT'))`;
+      const normalizedHash = txHash.startsWith("0x") ? txHash.toLowerCase() : "0x" + txHash.toLowerCase();
+      const rows = await sql`WITH created AS (
+        INSERT INTO deposits (reference, user_id, amount, currency, status, tx_hash)
+        VALUES (${reference}, ${profile.novopay_id}, ${amount}, 'USDT', 'pending', ${normalizedHash})
+        RETURNING reference, amount, status, tx_hash, created_at
+      ), audited AS (
+        INSERT INTO audit_logs (actor_uid, action, entity_type, entity_id, details)
+        SELECT ${decoded.uid}, 'deposit_requested', 'deposit', reference, jsonb_build_object('amount', amount, 'currency', 'USDT') FROM created
+        RETURNING id
+      )
+      SELECT created.* FROM created CROSS JOIN (SELECT count(*) FROM audited) audit_guard`;
       return res.status(201).json({ ok: true, message: "Deposit request submitted. Funds will be credited only after transaction verification.", record: rows[0] });
     }
 
@@ -56,11 +65,26 @@ export default async function handler(req, res) {
       const feeRate = 0.05;
       const fee = (Number(amount) * feeRate).toFixed(8);
       const net = (Number(amount) - Number(fee)).toFixed(8);
-      const debited = await sql`UPDATE users SET fund_balance = fund_balance - ${amount}::numeric, updated_at = now() WHERE novopay_id = ${profile.novopay_id} AND fund_balance >= ${amount}::numeric RETURNING novopay_id`;
-      if (!debited.length) fail("Insufficient Fund Wallet balance.", 409);
-      const rows = await sql`INSERT INTO withdrawals (reference, user_id, amount, fee, net_amount, currency, status, payout_reference) VALUES (${reference}, ${profile.novopay_id}, ${amount}, ${fee}, ${net}, 'USDT', 'pending', ${address}) RETURNING reference, amount, fee, net_amount, status, created_at`;
-      await sql`INSERT INTO ledger_transactions (reference, user_id, type, amount, currency, status, description, idempotency_key) VALUES (${"LD" + reference}, ${profile.novopay_id}, 'withdrawal_request', -${amount}::numeric, 'USDT', 'posted', 'Withdrawal request; 5% fee applied at payout', ${"withdrawal:" + reference})`;
-      await sql`INSERT INTO audit_logs (actor_uid, action, entity_type, entity_id, details) VALUES (${decoded.uid}, 'withdrawal_requested', 'withdrawal', ${reference}, jsonb_build_object('amount', ${amount}::numeric, 'fee', ${fee}::numeric, 'net', ${net}::numeric))`;
+      const rows = await sql`WITH debited AS (
+        UPDATE users SET fund_balance = fund_balance - ${amount}::numeric, updated_at = now()
+        WHERE novopay_id = ${profile.novopay_id} AND fund_balance >= ${amount}::numeric
+        RETURNING novopay_id
+      ), created AS (
+        INSERT INTO withdrawals (reference, user_id, amount, fee, net_amount, currency, status, payout_reference)
+        SELECT ${reference}, novopay_id, ${amount}, ${fee}, ${net}, 'USDT', 'pending', ${address} FROM debited
+        RETURNING reference, amount, fee, net_amount, status, created_at, user_id
+      ), ledger AS (
+        INSERT INTO ledger_transactions (reference, user_id, type, amount, currency, status, description, idempotency_key)
+        SELECT ${"LD" + reference}, user_id, 'withdrawal_request', -amount, 'USDT', 'posted', 'Withdrawal request; 5% fee applied at payout', ${"withdrawal:" + reference} FROM created
+        RETURNING id
+      ), audited AS (
+        INSERT INTO audit_logs (actor_uid, action, entity_type, entity_id, details)
+        SELECT ${decoded.uid}, 'withdrawal_requested', 'withdrawal', reference, jsonb_build_object('amount', amount, 'fee', fee, 'net', net_amount) FROM created
+        RETURNING id
+      )
+      SELECT created.reference, created.amount, created.fee, created.net_amount, created.status, created.created_at
+      FROM created CROSS JOIN (SELECT count(*) FROM ledger) ledger_guard CROSS JOIN (SELECT count(*) FROM audited) audit_guard`;
+      if (!rows.length) fail("Insufficient Fund Wallet balance.", 409);
       return res.status(201).json({ ok: true, message: "Withdrawal request submitted for admin review.", record: rows[0] });
     }
 
@@ -71,11 +95,26 @@ export default async function handler(req, res) {
       const pkg = packages[0];
       if (!pkg || pkg.status !== "active") fail("This package is not currently available.", 409);
       const purchaseRef = reference;
-      const debited = await sql`UPDATE users SET fund_balance = fund_balance - ${pkg.price}::numeric, updated_at = now() WHERE novopay_id = ${profile.novopay_id} AND fund_balance >= ${pkg.price}::numeric RETURNING novopay_id`;
-      if (!debited.length) fail("Insufficient Fund Wallet balance. Deposit and verify funds first.", 409);
-      const activation = await sql`INSERT INTO package_activations (reference, user_id, package_id, amount, currency, status, activated_at) VALUES (${purchaseRef}, ${profile.novopay_id}, ${pkg.id}::uuid, ${pkg.price}, ${pkg.currency}, 'active', now()) RETURNING reference, amount, status, activated_at`;
-      await sql`INSERT INTO ledger_transactions (reference, user_id, type, amount, currency, status, description, idempotency_key) VALUES (${"LD" + purchaseRef}, ${profile.novopay_id}, 'package_purchase', -${pkg.price}::numeric, ${pkg.currency}, 'posted', ${"Package purchase: " + pkg.name}, ${"package:" + purchaseRef})`;
-      await sql`INSERT INTO audit_logs (actor_uid, action, entity_type, entity_id, details) VALUES (${decoded.uid}, 'package_purchased', 'package_activation', ${purchaseRef}, jsonb_build_object('package_id', ${pkg.id}::text, 'amount', ${pkg.price}::numeric))`;
+      const activation = await sql`WITH debited AS (
+        UPDATE users SET fund_balance = fund_balance - ${pkg.price}::numeric, updated_at = now()
+        WHERE novopay_id = ${profile.novopay_id} AND fund_balance >= ${pkg.price}::numeric
+        RETURNING novopay_id
+      ), created AS (
+        INSERT INTO package_activations (reference, user_id, package_id, amount, currency, status, activated_at)
+        SELECT ${purchaseRef}, novopay_id, ${pkg.id}::uuid, ${pkg.price}, ${pkg.currency}, 'active', now() FROM debited
+        RETURNING reference, user_id, package_id, amount, currency, status, activated_at
+      ), ledger AS (
+        INSERT INTO ledger_transactions (reference, user_id, type, amount, currency, status, description, idempotency_key)
+        SELECT ${"LD" + purchaseRef}, user_id, 'package_purchase', -amount, currency, 'posted', ${"Package purchase: " + pkg.name}, ${"package:" + purchaseRef} FROM created
+        RETURNING id
+      ), audited AS (
+        INSERT INTO audit_logs (actor_uid, action, entity_type, entity_id, details)
+        SELECT ${decoded.uid}, 'package_purchased', 'package_activation', reference, jsonb_build_object('package_id', package_id::text, 'amount', amount) FROM created
+        RETURNING id
+      )
+      SELECT created.reference, created.amount, created.status, created.activated_at
+      FROM created CROSS JOIN (SELECT count(*) FROM ledger) ledger_guard CROSS JOIN (SELECT count(*) FROM audited) audit_guard`;
+      if (!activation.length) fail("Insufficient Fund Wallet balance. Deposit and verify funds first.", 409);
       return res.status(201).json({ ok: true, message: "Package activated.", record: activation[0] });
     }
     fail("Unsupported action.");
