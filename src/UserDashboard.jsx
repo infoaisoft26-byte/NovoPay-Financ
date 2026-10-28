@@ -56,6 +56,8 @@ export default function UserDashboard({ user, onLogout }) {
   const [query, setQuery] = useState("");
   const [mobileOpen, setMobileOpen] = useState(false);
   const [lastUpdated, setLastUpdated] = useState(null);
+  const [purchaseBusyId, setPurchaseBusyId] = useState("");
+  const [actionMessage, setActionMessage] = useState(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -109,6 +111,38 @@ export default function UserDashboard({ user, onLogout }) {
     setSection(next);
     setQuery("");
     setMobileOpen(false);
+    setActionMessage(null);
+  }
+
+  async function activatePackage(pkg) {
+    if (!profile || purchaseBusyId) return;
+    if (Number(profile.fund_balance) < Number(pkg.price)) {
+      setActionMessage({ type: "error", text: "Fund Wallet balance is not enough for this package." });
+      return;
+    }
+    setPurchaseBusyId(pkg.id);
+    setActionMessage(null);
+    try {
+      const token = await user.getIdToken();
+      const response = await fetch("/api/user", {
+        method: "POST",
+        headers: { Authorization: "Bearer " + token, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "activate-package",
+          package_id: pkg.id,
+          idempotency_key: crypto.randomUUID(),
+        }),
+        cache: "no-store",
+      });
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(result.error || "Package activation could not be completed.");
+      setActionMessage({ type: "success", text: result.message || "Package activated successfully." });
+      await load();
+    } catch (err) {
+      setActionMessage({ type: "error", text: err.message || "Package activation could not be completed. Refresh and check your package history." });
+    } finally {
+      setPurchaseBusyId("");
+    }
   }
 
   return (
@@ -154,6 +188,8 @@ export default function UserDashboard({ user, onLogout }) {
             <button className="np-user-refresh" onClick={load} disabled={loading}><RefreshCw size={15} className={loading ? "spin" : ""} /> Refresh</button>
           </div>
 
+          {actionMessage && <div className={actionMessage.type === "success" ? "np-user-action-message success" : "np-user-action-message error"} role="status"><span>{actionMessage.text}</span><button onClick={() => setActionMessage(null)} aria-label="Dismiss message"><X size={16} /></button></div>}
+
           {error && <div className="np-user-error" role="alert"><CircleHelp size={19} /><div><b>Account data unavailable</b><p>{error}</p><small>Financial values are hidden until the secure NovoPay backend returns verified records.</small><button onClick={load}>Try again</button></div></div>}
 
           {!error && section === "overview" && (
@@ -179,7 +215,7 @@ export default function UserDashboard({ user, onLogout }) {
 
           {!error && section === "wallet" && <><div className="np-user-stats"><Stat icon={Wallet} label="Fund Wallet" value={profile ? money(profile.fund_balance) : "—"} tone="blue" /><Stat icon={Activity} label="Income Wallet" value={profile ? money(profile.income_balance) : "—"} tone="green" /></div><section className="np-user-panel"><PanelTitle title="Wallet ledger" subtitle="Verified wallet entries" /><Records rows={rows} type="transactions" loading={loading} /></section></>}
           {!error && ["deposits", "withdrawals", "transactions", "p2p", "support"].includes(section) && <section className="np-user-panel np-user-table-panel"><div className="np-user-table-toolbar"><PanelTitle title={title[0]} subtitle="Records returned for your account" /><label className="np-user-search"><Search size={16} /><input value={query} onChange={e => setQuery(e.target.value)} placeholder="Search records…" /></label></div><Records rows={rows} type={section} loading={loading} /></section>}
-          {!error && section === "packages" && <><section className="np-user-panel"><PanelTitle title="My package activations" subtitle="Your package purchases and activation status" /><Records rows={data?.activations || []} type="activations" loading={loading} /></section><section className="np-user-panel"><PanelTitle title="Available packages" subtitle="Only packages configured in NovoPay are shown" />{loading ? <Loading /> : rows.length ? <div className="np-user-package-grid">{rows.map(row => <article className="np-user-package" key={row.id}><span className="np-user-package-icon"><Package size={21} /></span><span className={`np-user-status ${statusClass(row.status)}`}>{row.status}</span><h3>{row.name}</h3><strong>{money(row.price)}</strong><p>{row.description || "Package details have not been provided."}</p><button disabled>Purchase unavailable</button></article>)}</div> : <Empty title="No packages available" message="No active packages were returned by the NovoPay backend." />}</section></>}
+          {!error && section === "packages" && <><section className="np-user-panel"><PanelTitle title="My package activations" subtitle="Your package purchases and activation status" /><Records rows={data?.activations || []} type="activations" loading={loading} /></section><section className="np-user-panel"><PanelTitle title="Available packages" subtitle="Choose a package using your available Fund Wallet balance" />{loading ? <Loading /> : rows.length ? <div className="np-user-package-grid">{rows.map(row => <article className="np-user-package" key={row.id}><span className="np-user-package-icon"><Package size={21} /></span><span className={`np-user-status ${statusClass(row.status)}`}>{row.status}</span><h3>{row.name}</h3><strong>{money(row.price)}</strong><p>{row.description || "Package details have not been provided."}</p><small className="np-user-package-balance">Fund Wallet: {profile ? money(profile.fund_balance) : "—"}</small><button onClick={() => activatePackage(row)} disabled={!profile || row.status !== "active" || Boolean(purchaseBusyId) || loading}>{purchaseBusyId === row.id ? "Activating…" : "Activate package"}</button></article>)}</div> : <Empty title="No packages available" message="No active packages were returned by the NovoPay backend." />}</section></>}
           {!error && section === "profile" && <section className="np-user-panel"><PanelTitle title="Profile information" subtitle="Verified details from your NovoPay account" />{profile ? <div className="np-user-profile-grid"><ProfileField label="Full name" value={profile.full_name} /><ProfileField label="NovoPay ID" value={profile.novopay_id} /><ProfileField label="Email address" value={profile.email} /><ProfileField label="Account status" value={profile.status} /><ProfileField label="Member since" value={date(profile.created_at)} /></div> : <Empty title="Profile not ready" message="Your verified profile will appear here once the account record has been created." />}</section>}
           {!error && section === "support" && <section className="np-user-panel"><PanelTitle title="Support" subtitle="Your support history" /><Records rows={rows} type="support" loading={loading} /><div className="np-user-support-note"><CircleHelp size={19} /><div><b>Need help?</b><p>Support ticket creation will be enabled when the secure account API is configured.</p></div></div></section>}
         </div>
