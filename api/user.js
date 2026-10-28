@@ -5,24 +5,61 @@ import { neon } from "@neondatabase/serverless";
 
 let adminAuth;
 let sql;
+
+function configurationError(message) {
+  const error = new Error(message);
+  error.status = 503;
+  return error;
+}
+
+function parseServiceAccount(rawValue) {
+  let value = String(rawValue || "").trim();
+  if (!value) throw configurationError("NovoPay Firebase server credentials are missing.");
+
+  let serviceAccount;
+  try {
+    serviceAccount = JSON.parse(value);
+  } catch {
+    // Accept a base64-encoded service-account JSON as well as plain JSON.
+    try {
+      serviceAccount = JSON.parse(Buffer.from(value, "base64").toString("utf8"));
+    } catch {
+      throw configurationError("NovoPay Firebase server credentials are not valid JSON. Recheck FIREBASE_SERVICE_ACCOUNT_JSON.");
+    }
+  }
+  if (typeof serviceAccount === "string") {
+    try {
+      serviceAccount = JSON.parse(serviceAccount);
+    } catch {
+      throw configurationError("NovoPay Firebase server credentials are not valid JSON.");
+    }
+  }
+  if (!serviceAccount || typeof serviceAccount !== "object" ||
+      serviceAccount.project_id !== "novopay-finance" ||
+      !serviceAccount.client_email || !serviceAccount.private_key) {
+    throw configurationError("NovoPay Firebase server credentials must be a complete service account for novopay-finance.");
+  }
+  serviceAccount.private_key = String(serviceAccount.private_key).replace(/\\n/g, "\n");
+  return serviceAccount;
+}
+
 function services() {
-  const serviceAccountJson = process.env.FIREBASE_SERVICE_ACCOUNT_JSON;
-  if (!serviceAccountJson || !process.env.DATABASE_URL) {
-    const error = new Error("NovoPay account backend is not configured yet.");
-    error.status = 503;
-    throw error;
+  const rawServiceAccount = process.env.FIREBASE_SERVICE_ACCOUNT_JSON;
+  const databaseUrl = String(process.env.DATABASE_URL || "").trim();
+  if (!rawServiceAccount || !databaseUrl) {
+    throw configurationError("NovoPay account backend is not configured yet. Check the production server environment variables.");
+  }
+  if (!/^postgres(?:ql)?:\/\//i.test(databaseUrl)) {
+    throw configurationError("NovoPay DATABASE_URL is not a valid PostgreSQL connection URL.");
   }
   if (!adminAuth) {
-    const serviceAccount = JSON.parse(serviceAccountJson);
-    if (serviceAccount.project_id !== "novopay-finance") {
-      const error = new Error("NovoPay Firebase service account must belong to the novopay-finance project.");
-      error.status = 503;
-      throw error;
-    }
-    const app = getApps()[0] || initializeApp({ credential: cert(serviceAccount) });
+    const serviceAccount = parseServiceAccount(rawServiceAccount);
+    const appName = "novopay-user-api";
+    const app = getApps().find((item) => item.name === appName) ||
+      initializeApp({ credential: cert(serviceAccount), projectId: "novopay-finance" }, appName);
     adminAuth = getAuth(app);
   }
-  if (!sql) sql = neon(process.env.DATABASE_URL);
+  if (!sql) sql = neon(databaseUrl);
   return { adminAuth, sql };
 }
 
