@@ -82,7 +82,7 @@ const sectionQueries = {
       (SELECT count(*)::int FROM users child WHERE child.sponsor_user_id = u.novopay_id) AS direct_members
     FROM users u LEFT JOIN package_activations a ON a.user_id = u.novopay_id
     WHERE (COALESCE(u.novopay_id, '') ILIKE ${q} OR COALESCE(u.full_name, '') ILIKE ${q})
-    GROUP BY u.novopay_id, u.full_name, u.sponsor_user_id
+    GROUP BY u.novopay_id, u.full_name, u.sponsor_user_id, u.created_at
     ORDER BY total_investment DESC, u.created_at ASC LIMIT ${limit}`,
   settings: (sql) => sql`SELECT 'Database connection' AS name, 'connected' AS status, 'Live NovoPay database queries are responding' AS details
     UNION ALL SELECT 'Package catalog', CASE WHEN count(*) FILTER (WHERE status = 'active') > 0 THEN 'active' ELSE 'needs setup' END, count(*) FILTER (WHERE status = 'active')::text || ' active packages' FROM packages
