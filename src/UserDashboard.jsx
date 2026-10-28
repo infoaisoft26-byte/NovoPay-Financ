@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
-  Activity, ArrowDownLeft, ArrowLeftRight, ArrowUpRight, Bell, ChevronRight,
+  Activity, ArrowDownLeft, ArrowLeftRight, ArrowUpRight, Bell, ChevronRight, Users, Copy,
   CircleHelp, Clock3, CreditCard, Download, FileText, Home, Layers3, LogOut,
   Menu, Package, RefreshCw, Search, ShieldCheck, UserRound, Wallet, X
 } from "lucide-react";
@@ -13,6 +13,7 @@ const NAV = [
   { id: "withdrawals", label: "Withdrawals", icon: ArrowUpRight },
   { id: "transactions", label: "Transactions", icon: Activity },
   { id: "packages", label: "Packages", icon: Layers3 },
+  { id: "referrals", label: "Referrals & Income", icon: Users },
   { id: "p2p", label: "P2P Transfer", icon: ArrowLeftRight },
   { id: "support", label: "Help & Support", icon: CircleHelp },
   { id: "profile", label: "My Profile", icon: UserRound },
@@ -25,6 +26,7 @@ const TITLES = {
   withdrawals: ["Withdrawals", "Review withdrawal request history."],
   transactions: ["Transactions", "Your account ledger, newest first."],
   packages: ["Packages", "Available packages configured by NovoPay."],
+  referrals: ["Referrals & Income", "Your referral ID, direct members and credited rewards."],
   p2p: ["P2P Transfer", "Peer-to-peer transfers are not enabled yet."],
   support: ["Help & Support", "Get help with your account."],
   profile: ["My Profile", "Your registered account details."],
@@ -201,6 +203,21 @@ export default function UserDashboard({ user, onLogout }) {
           {!error && section === "withdrawals" && <section className="np-user-panel"><PanelTitle title="Request a withdrawal" subtitle="5% service fee; payout is reviewed by admin. Confirm your address carefully." /><form className="np-user-action-form" onSubmit={e => { e.preventDefault(); submitAction("withdrawal-request", { amount: withdrawAmount, payout_address: payoutAddress }); }}><label>Amount (USDT)<input type="number" min="0.01" step="0.00000001" required value={withdrawAmount} onChange={e => setWithdrawAmount(e.target.value)} /></label><label>BSC payout address<input required pattern="0x[a-fA-F0-9]{40}" value={payoutAddress} onChange={e => setPayoutAddress(e.target.value.trim())} placeholder="0x…" /></label><button disabled={actionBusy}>{actionBusy ? "Submitting…" : "Request withdrawal"}</button>{actionMessage && <p role="status">{actionMessage}</p>}</form><div className="np-user-table-toolbar"><PanelTitle title="Withdrawal history" subtitle="Your submitted requests" /><label className="np-user-search"><Search size={16} /><input value={query} onChange={e => setQuery(e.target.value)} placeholder="Search records…" /></label></div><Records rows={rows} type={section} loading={loading} /></section>}
           {!error && ["transactions", "p2p", "support"].includes(section) && <section className="np-user-panel np-user-table-panel"><div className="np-user-table-toolbar"><PanelTitle title={title[0]} subtitle="Records returned for your account" /><label className="np-user-search"><Search size={16} /><input value={query} onChange={e => setQuery(e.target.value)} placeholder="Search records…" /></label></div><Records rows={rows} type={section} loading={loading} /></section>}
           {!error && section === "packages" && <><section className="np-user-panel"><PanelTitle title="My package activations" subtitle="Your package purchases and activation status" /><Records rows={data?.activations || []} type="activations" loading={loading} /></section><section className="np-user-panel"><PanelTitle title="Available packages" subtitle="NovoPay package catalog; returns are estimates, not guarantees" />{loading ? <Loading /> : rows.length ? <div className="np-user-package-grid">{rows.map(row => { const daily = Number(row.price || 0) * Number(row.roi_rate || 0) / 100; const total = daily * Number(row.duration_days || 0); return <article className="np-user-package" key={row.id}><span className="np-user-package-icon"><Package size={21} /></span><span className={`np-user-status ${statusClass(row.status)}`}>{row.status}</span><small className="np-user-eyebrow">{String(row.package_type || "package").toUpperCase()} {row.package_code ? "· " + row.package_code : ""}</small><h3>{row.name}</h3><strong>{money(row.price)}</strong><p>{row.description || "Package terms are configured by NovoPay."}</p>{row.roi_rate != null && row.duration_days != null && <div className="np-user-package-terms"><p>Daily rate: <b>{Number(row.roi_rate).toFixed(2)}%</b></p><p>Daily amount: <b>{money(daily)}</b></p><p>Duration: <b>{Number(row.duration_days)} days</b></p><p>Total scheduled return: <b>{money(total)}</b></p>{row.package_type === "fd" && <p>Maturity estimate: <b>{money(Number(row.price) + total)}</b></p>}</div>}<button disabled={actionBusy || Number(profile?.fund_balance || 0) < Number(row.price || 0)} onClick={() => { if (window.confirm("Activate " + row.name + " for " + money(row.price) + " from your Fund Wallet?")) submitAction("package-purchase", { package_id: row.id }); }}>{actionBusy ? "Processing…" : Number(profile?.fund_balance || 0) < Number(row.price || 0) ? "Insufficient balance" : "Activate package"}</button></article>; })}</div> : <Empty title="No packages available" message="Apply the NovoPay package migration to add the Basic and FD catalog." />}</section></>}
+          {!error && section === "referrals" && <section className="np-user-referrals">
+            <div className="np-user-panel np-user-referral-card">
+              <PanelTitle title="Your Referral ID" subtitle="Share this link so new members can register under your account." />
+              <div className="np-user-referral-code">{profile?.referral_code || profile?.novopay_id || "Loading…"}</div>
+              <div className="np-user-referral-link">{typeof window !== "undefined" && profile ? window.location.origin + "/register?ref=" + encodeURIComponent(profile.referral_code || profile.novopay_id) : "Your referral link will appear here."}</div>
+              <button className="np-user-referral-copy" disabled={!profile} onClick={async () => { try { await navigator.clipboard.writeText(window.location.origin + "/register?ref=" + encodeURIComponent(profile.referral_code || profile.novopay_id)); setActionMessage("Referral link copied."); } catch { setActionMessage("Copy was unavailable. Select and copy the referral link above."); } }}><Copy size={16} /> Copy referral link</button>
+              {actionMessage && <p className="np-user-referral-message" role="status">{actionMessage}</p>}
+            </div>
+            <div className="np-user-stats">
+              <Stat icon={Users} label="Direct Members" value={String(data?.referralSummary?.direct_members ?? 0)} tone="blue" />
+              <Stat icon={Activity} label="Referral Income" value={money(data?.referralSummary?.referral_income ?? 0)} tone="green" />
+            </div>
+            <section className="np-user-panel"><PanelTitle title="Referral reward history" subtitle="Direct rewards credited after eligible package activation" /><Records rows={rows} type="referrals" loading={loading} /></section>
+            <section className="np-user-panel"><PanelTitle title="Your direct members" subtitle="Members registered with your referral ID" />{loading ? <Loading /> : data?.members?.length ? <div className="np-user-table-wrap"><table className="np-user-table"><thead><tr><th>NovoPay ID</th><th>Member</th><th>Status</th><th>Joined</th></tr></thead><tbody>{data.members.map(member => <tr key={member.novopay_id}><td><span className="np-user-ref">{member.novopay_id}</span></td><td>{member.full_name || "Member"}</td><td><span className={`np-user-status ${statusClass(member.status)}`}>{member.status}</span></td><td>{date(member.created_at)}</td></tr>)}</tbody></table></div> : <Empty title="No direct members yet" message="Share your referral link to invite new members." />}</section>
+          </section>}
           {!error && section === "profile" && <section className="np-user-panel"><PanelTitle title="Profile information" subtitle="Verified details from your NovoPay account" />{profile ? <div className="np-user-profile-grid"><ProfileField label="Full name" value={profile.full_name} /><ProfileField label="NovoPay ID" value={profile.novopay_id} /><ProfileField label="Email address" value={profile.email} /><ProfileField label="Account status" value={profile.status} /><ProfileField label="Member since" value={date(profile.created_at)} /></div> : <Empty title="Profile not ready" message="Your verified profile will appear here once the account record has been created." />}</section>}
           {!error && section === "support" && <section className="np-user-panel"><PanelTitle title="Support" subtitle="Your support history" /><Records rows={rows} type="support" loading={loading} /><div className="np-user-support-note"><CircleHelp size={19} /><div><b>Need help?</b><p>Support ticket creation will be enabled when the secure account API is configured.</p></div></div></section>}
         </div>
@@ -228,7 +245,9 @@ function Empty({ title, message }) {
 function Records({ rows, type, loading }) {
   if (loading) return <Loading />;
   if (!rows?.length) return <Empty title="No records yet" message="There are no verified records to display for this section." />;
-  const columns = type === "activations"
+  const columns = type === "referrals"
+    ? [["reference", "Reward Ref"], ["referred_user_id", "Member ID"], ["basis_amount", "Package Amount"], ["amount", "Reward"], ["status", "Status"], ["created_at", "Date"]]
+    : type === "activations"
     ? [["reference", "Reference"], ["package_name", "Package"], ["amount", "Amount"], ["status", "Status"], ["activated_at", "Activated"]]
     : type === "deposits"
     ? [["reference", "Reference"], ["amount", "Amount"], ["status", "Status"], ["created_at", "Created"]]
