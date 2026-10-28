@@ -103,6 +103,26 @@ export default async function handler(req, res) {
         INSERT INTO package_activations (reference, user_id, package_id, amount, currency, status, activated_at)
         SELECT ${purchaseRef}, novopay_id, ${pkg.id}::uuid, ${pkg.price}, ${pkg.currency}, 'active', now() FROM debited
         RETURNING reference, user_id, package_id, amount, currency, status, activated_at
+      ), commission AS (
+        INSERT INTO referral_commissions (reference, sponsor_user_id, referred_user_id, package_activation_ref, basis_amount, rate, amount, currency, status)
+        SELECT ${"RC" + purchaseRef}, sponsor.novopay_id, created.user_id, created.reference, created.amount, 0.10, round(created.amount * 0.10, 8), created.currency, 'posted'
+        FROM created
+        JOIN users referred ON referred.novopay_id = created.user_id
+        JOIN users sponsor ON sponsor.novopay_id = referred.sponsor_user_id AND sponsor.status = 'active'
+        WHERE referred.sponsor_user_id IS NOT NULL
+        ON CONFLICT (package_activation_ref) DO NOTHING
+        RETURNING reference, sponsor_user_id, referred_user_id, package_activation_ref, amount, currency
+      ), sponsor_credit AS (
+        UPDATE users sponsor SET income_balance = sponsor.income_balance + commission.amount, updated_at = now()
+        FROM commission
+        WHERE sponsor.novopay_id = commission.sponsor_user_id
+        RETURNING sponsor.novopay_id, commission.reference, commission.referred_user_id, commission.package_activation_ref, commission.amount, commission.currency
+      ), referral_ledger AS (
+        INSERT INTO ledger_transactions (reference, user_id, type, amount, currency, status, description, idempotency_key)
+        SELECT ${"RL" + purchaseRef}, sponsor_credit.novopay_id, 'referral_income', sponsor_credit.amount, sponsor_credit.currency, 'posted', ${"Direct referral reward (10%) for package activation " + purchaseRef}, ${"referral:" + purchaseRef}
+        FROM sponsor_credit
+        ON CONFLICT (idempotency_key) DO NOTHING
+        RETURNING id
       ), ledger AS (
         INSERT INTO ledger_transactions (reference, user_id, type, amount, currency, status, description, idempotency_key)
         SELECT ${"LD" + purchaseRef}, user_id, 'package_purchase', -amount, currency, 'posted', ${"Package purchase: " + pkg.name}, ${"package:" + purchaseRef} FROM created
@@ -112,7 +132,8 @@ export default async function handler(req, res) {
         SELECT ${decoded.uid}, 'package_purchased', 'package_activation', reference, jsonb_build_object('package_id', package_id::text, 'amount', amount) FROM created
         RETURNING id
       )
-      SELECT created.reference, created.amount, created.status, created.activated_at
+      SELECT created.reference, created.amount, created.status, created.activated_at,
+             COALESCE((SELECT sum(amount) FROM commission), 0) AS referral_reward
       FROM created CROSS JOIN (SELECT count(*) FROM ledger) ledger_guard CROSS JOIN (SELECT count(*) FROM audited) audit_guard`;
       if (!activation.length) fail("Insufficient Fund Wallet balance. Deposit and verify funds first.", 409);
       return res.status(201).json({ ok: true, message: "Package activated.", record: activation[0] });
