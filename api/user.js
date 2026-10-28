@@ -81,7 +81,7 @@ async function authenticatedUser(req, auth) {
 }
 
 async function getProfile(db, uid) {
-  const rows = await db`SELECT id, auth_uid, novopay_id, full_name, email, status, fund_balance, income_balance, created_at FROM users WHERE auth_uid = ${uid} LIMIT 1`;
+  const rows = await db`SELECT id, auth_uid, novopay_id, full_name, email, status, fund_balance, income_balance, referral_code, sponsor_user_id, created_at FROM users WHERE auth_uid = ${uid} LIMIT 1`;
   return rows[0] || null;
 }
 
@@ -109,8 +109,15 @@ export default async function handler(req, res) {
       const email = String(decoded.email || "").trim().toLowerCase();
       if (!email) return res.status(400).json({ error: "A verified email address is required." });
       const displayName = String(req.body?.full_name || decoded.name || email.split("@")[0] || "Member").trim().slice(0, 120);
+      const sponsorCode = String(req.body?.sponsor_code || "").trim().toUpperCase();
+      if (!sponsorCode) return res.status(400).json({ error: "Sponsor ID is required to register." });
+      const sponsorRows = await db`SELECT novopay_id FROM users WHERE status = 'active' AND (upper(COALESCE(referral_code, '')) = ${sponsorCode} OR upper(novopay_id) = ${sponsorCode}) LIMIT 1`;
+      if (!sponsorRows[0]) return res.status(400).json({ error: "Sponsor ID is invalid or inactive. Check the ID and try again." });
       const generatedId = "NP" + randomUUID().replace(/-/g, "").slice(0, 18).toUpperCase();
-      const rows = await db`INSERT INTO users (auth_uid, novopay_id, full_name, email) VALUES (${decoded.uid}, ${generatedId}, ${displayName || "Member"}, ${email}) ON CONFLICT (auth_uid) DO UPDATE SET full_name = CASE WHEN users.full_name = '' THEN EXCLUDED.full_name ELSE users.full_name END, email = EXCLUDED.email, updated_at = now() RETURNING id, auth_uid, novopay_id, full_name, email, status, fund_balance, income_balance, created_at`;
+      const rows = await db`INSERT INTO users (auth_uid, novopay_id, referral_code, sponsor_user_id, full_name, email)
+        VALUES (${decoded.uid}, ${generatedId}, ${generatedId}, ${sponsorRows[0].novopay_id}, ${displayName || "Member"}, ${email})
+        ON CONFLICT (auth_uid) DO UPDATE SET full_name = CASE WHEN users.full_name = '' THEN EXCLUDED.full_name ELSE users.full_name END, email = EXCLUDED.email, referral_code = COALESCE(users.referral_code, users.novopay_id), updated_at = now()
+        RETURNING id, auth_uid, novopay_id, full_name, email, status, fund_balance, income_balance, referral_code, sponsor_user_id, created_at`;
       return res.status(200).json({ ok: true, user: rows[0] });
     }
 
