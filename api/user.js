@@ -66,7 +66,83 @@ export default async function handler(req, res) {
     const decoded = await authenticatedUser(req, auth);
 
     if (req.method === "POST") {
-      if (req.body?.action !== "ensure-profile") {
+      const action = String(req.body?.action || "");
+      if (action === "activate-package") {
+        const packageId = String(req.body?.package_id || "");
+        const idempotencyKey = String(req.body?.idempotency_key || "");
+        if (!/^[0-9a-f-]{36}$/i.test(packageId)) {
+          return res.status(400).json({ error: "Choose a valid package." });
+        }
+        if (!/^[0-9a-f-]{36}$/i.test(idempotencyKey)) {
+          return res.status(400).json({ error: "Please refresh and try activating the package again." });
+        }
+
+        const profile = await getProfile(db, decoded.uid);
+        if (!profile) return res.status(409).json({ error: "Your account profile is not ready yet. Refresh the dashboard and try again." });
+        if (profile.status !== "active") return res.status(403).json({ error: "Your account is not active. Please contact NovoPay support." });
+
+        const previous = await db`SELECT reference, amount, currency, description, created_at FROM ledger_transactions WHERE idempotency_key = ${idempotencyKey} LIMIT 1`;
+        if (previous[0]) {
+          return res.status(200).json({ ok: true, duplicate: true, message: "This package activation was already processed.", activation: previous[0] });
+        }
+
+        const activationReference = "NPA-" + randomUUID().replace(/-/g, "").slice(0, 18).toUpperCase();
+        const ledgerReference = "NPL-" + randomUUID().replace(/-/g, "").slice(0, 18).toUpperCase();
+        let result;
+        try {
+          result = await db`WITH selected_package AS MATERIALIZED (
+              SELECT id, name, price, currency FROM packages WHERE id = ${packageId}::uuid AND status = 'active'
+            ),
+            debited_user AS (
+              UPDATE users AS u
+              SET fund_balance = u.fund_balance - p.price, updated_at = now()
+              FROM selected_package AS p
+              WHERE u.auth_uid = ${decoded.uid}
+                AND u.status = 'active'
+                AND u.fund_balance >= p.price
+                AND NOT EXISTS (SELECT 1 FROM ledger_transactions WHERE idempotency_key = ${idempotencyKey})
+              RETURNING u.novopay_id, u.fund_balance, u.income_balance
+            ),
+            activation AS (
+              INSERT INTO package_activations (reference, user_id, package_id, amount, currency, status, activated_at)
+              SELECT ${activationReference}, d.novopay_id, p.id, p.price, p.currency, 'active', now()
+              FROM debited_user AS d CROSS JOIN selected_package AS p
+              RETURNING reference, user_id, package_id, amount, currency, status, activated_at, created_at
+            ),
+            ledger AS (
+              INSERT INTO ledger_transactions (reference, user_id, type, amount, currency, status, description, idempotency_key)
+              SELECT ${ledgerReference}, a.user_id, 'package_purchase', -a.amount, a.currency, 'posted',
+                'Package activation: ' || p.name, ${idempotencyKey}
+              FROM activation AS a JOIN selected_package AS p ON p.id = a.package_id
+              RETURNING id
+            )
+            SELECT a.reference, a.user_id, a.package_id, p.name AS package_name, a.amount, a.currency,
+              a.status, a.activated_at, a.created_at, d.fund_balance, d.income_balance
+            FROM activation AS a
+            JOIN selected_package AS p ON p.id = a.package_id
+            CROSS JOIN debited_user AS d
+            CROSS JOIN ledger AS l`;
+        } catch (error) {
+          const duplicate = await db`SELECT reference, amount, currency, description, created_at FROM ledger_transactions WHERE idempotency_key = ${idempotencyKey} LIMIT 1`;
+          if (duplicate[0]) {
+            return res.status(200).json({ ok: true, duplicate: true, message: "This package activation was already processed.", activation: duplicate[0] });
+          }
+          throw error;
+        }
+        if (result[0]) {
+          return res.status(200).json({ ok: true, message: "Package activated successfully.", activation: result[0] });
+        }
+
+        const packageRows = await db`SELECT id, price, currency FROM packages WHERE id = ${packageId}::uuid AND status = 'active' LIMIT 1`;
+        if (!packageRows[0]) return res.status(404).json({ error: "This package is not available right now." });
+        const freshProfile = await getProfile(db, decoded.uid);
+        if (!freshProfile || Number(freshProfile.fund_balance) < Number(packageRows[0].price)) {
+          return res.status(400).json({ error: "Insufficient Fund Wallet balance for this package." });
+        }
+        return res.status(409).json({ error: "Package activation could not be completed. Refresh and try again." });
+      }
+
+      if (action !== "ensure-profile") {
         return res.status(400).json({ error: "Unsupported account action." });
       }
       const email = String(decoded.email || "").trim().toLowerCase();
