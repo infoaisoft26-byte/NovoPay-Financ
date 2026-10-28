@@ -106,7 +106,7 @@ export default async function handler(req, res) {
         RETURNING reference, user_id, package_id, amount, currency, status, activated_at
       ), commission AS (
         INSERT INTO referral_commissions (reference, sponsor_user_id, referred_user_id, package_activation_ref, basis_amount, rate, amount, currency, status)
-        SELECT ${"RC" + purchaseRef}, sponsor.novopay_id, created.user_id, created.reference, created.amount, 0.10, round(created.amount * 0.10, 8), created.currency, 'posted'
+        SELECT ${"RC" + purchaseRef}, sponsor.novopay_id, created.user_id, created.reference, created.amount, 0.07, round(created.amount * 0.07, 8), created.currency, 'posted'
         FROM created
         JOIN users referred ON referred.novopay_id = created.user_id
         JOIN users sponsor ON sponsor.novopay_id = referred.sponsor_user_id AND sponsor.status = 'active'
@@ -120,7 +120,7 @@ export default async function handler(req, res) {
         RETURNING sponsor.novopay_id, commission.reference, commission.referred_user_id, commission.package_activation_ref, commission.amount, commission.currency
       ), referral_ledger AS (
         INSERT INTO ledger_transactions (reference, user_id, type, amount, currency, status, description, idempotency_key)
-        SELECT ${"RL" + purchaseRef}, sponsor_credit.novopay_id, 'referral_income', sponsor_credit.amount, sponsor_credit.currency, 'posted', ${"Direct referral reward (10%) for package activation " + purchaseRef}, ${"referral:" + purchaseRef}
+        SELECT ${"RL" + purchaseRef}, sponsor_credit.novopay_id, 'referral_income', sponsor_credit.amount, sponsor_credit.currency, 'posted', ${"Direct referral reward (7%) for package activation " + purchaseRef}, ${"referral:" + purchaseRef}
         FROM sponsor_credit
         ON CONFLICT (idempotency_key) DO NOTHING
         RETURNING id
