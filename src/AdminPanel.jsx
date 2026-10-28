@@ -129,6 +129,7 @@ export default function AdminPanel({ user, onLogout }) {
   const [overviewCounts, setOverviewCounts] = useState(null);
   const [dataError, setDataError] = useState("");
   const [loadingData, setLoadingData] = useState(false);
+  const [settingUpAdmin, setSettingUpAdmin] = useState(false);
   const [reloadKey, setReloadKey] = useState(0);
   const sections = useMemo(() => navGroups.flatMap(g => g.items), []);
   const active = sections.find(x => x.label === section) || { icon: LayoutDashboard };
@@ -235,6 +236,7 @@ export default function AdminPanel({ user, onLogout }) {
             <button className="np-admin-refresh" onClick={requestRefresh}><RefreshCw size={16}/> Refresh</button>
           </div>
           {notice && <div className="np-admin-notice" role="status"><CircleHelp size={17}/><span>{notice}</span><button onClick={() => setNotice("")} aria-label="Dismiss"><X size={16}/></button></div>}
+          {dataError.includes("Admin server permission is not set") && <div className="np-admin-inline-error" role="alert"><ShieldAlert size={17}/><span>Admin permission setup is required for this Firebase account.</span><button className="np-admin-refresh" disabled={settingUpAdmin} onClick={async () => { setSettingUpAdmin(true); setDataError(""); try { const token = await user.getIdToken(true); const response = await fetch("/api/setup-admin", { method: "POST", headers: { Authorization: "Bearer " + token } }); const payload = await response.json().catch(() => ({})); if (!response.ok) throw new Error(payload.error || "Admin setup could not be completed."); await user.getIdToken(true); setDataError(""); setNotice("Admin access setup complete. Loading your admin records."); setReloadKey(value => value + 1); } catch (error) { setDataError(error.message || "Admin setup could not be completed."); } finally { setSettingUpAdmin(false); } }}>{settingUpAdmin ? "Setting up…" : "Set up admin access"}</button></div>}
 
           {section === "Overview" ? <>
             <div className="np-admin-welcome">
