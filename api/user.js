@@ -160,6 +160,14 @@ export default async function handler(req, res) {
       const rows = await queries.transactions(db, profile.novopay_id, pattern, limit);
       return res.status(200).json({ ok: true, section, user: profile, rows });
     }
+    if (section === "referrals") {
+      const [members, commissions, summary] = await Promise.all([
+        db`SELECT novopay_id, full_name, status, created_at FROM users WHERE sponsor_user_id = ${profile.novopay_id} ORDER BY created_at DESC LIMIT ${limit}`,
+        db`SELECT reference, referred_user_id, basis_amount, rate, amount, currency, status, created_at FROM referral_commissions WHERE sponsor_user_id = ${profile.novopay_id} ORDER BY created_at DESC LIMIT ${limit}`,
+        db`SELECT (SELECT count(*)::int FROM users WHERE sponsor_user_id = ${profile.novopay_id}) AS direct_members, COALESCE((SELECT sum(amount) FROM referral_commissions WHERE sponsor_user_id = ${profile.novopay_id} AND status = 'posted'), 0)::numeric AS referral_income`
+      ]);
+      return res.status(200).json({ ok: true, section, user: profile, rows: commissions, members, referralSummary: summary[0] });
+    }
     const query = queries[section];
     if (!query) return res.status(400).json({ error: "Unknown account section." });
     const rows = await query(db, profile.novopay_id, pattern, limit);
