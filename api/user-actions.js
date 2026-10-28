@@ -39,10 +39,10 @@ export default async function handler(req, res) {
     const { auth, sql } = services();
     const { decoded, profile } = await userFor(req, auth, sql);
     const action = String(req.body?.action || "");
-    const amount = positiveAmount(req.body?.amount);
     const reference = "NP" + randomUUID().replace(/-/g, "").slice(0, 16).toUpperCase();
 
     if (action === "deposit-request") {
+      const amount = positiveAmount(req.body?.amount);
       const txHash = String(req.body?.tx_hash || "").trim();
       if (!/^(0x)?[a-fA-F0-9]{64}$/.test(txHash)) fail("Enter a valid BSC transaction hash.");
       const normalizedHash = txHash.startsWith("0x") ? txHash.toLowerCase() : "0x" + txHash.toLowerCase();
@@ -60,6 +60,7 @@ export default async function handler(req, res) {
     }
 
     if (action === "withdrawal-request") {
+      const amount = positiveAmount(req.body?.amount);
       const address = String(req.body?.payout_address || "").trim();
       if (!/^0x[a-fA-F0-9]{40}$/.test(address)) fail("Enter a valid BSC wallet address.");
       const feeRate = 0.05;
