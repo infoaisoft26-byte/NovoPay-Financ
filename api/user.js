@@ -249,7 +249,7 @@ export default async function handler(req, res) {
         return true;
       });
     }
-    if (section === "packages") {
+    if (["packages", "basic-package", "fd-package"].includes(section)) {
       const activations = await queries.activations(db, profile.novopay_id, pattern, limit);
       return res.status(200).json({ ok: true, section, user: profile, rows, activations, depositAddress, brochureUrl, maintenanceMode, platformSettings });
     }
