@@ -195,3 +195,19 @@
 
 /* NovoPay brand logo */
 .np-logo-image{display:block;width:clamp(190px,24vw,285px);height:auto;max-height:78px;object-fit:contain;object-position:left center}.np-brand{min-width:0}.np-dash-header .np-logo-image{width:220px;max-height:58px}@media(max-width:640px){.np-logo-image{width:min(230px,65vw);max-height:64px}.np-dash-header .np-logo-image{width:min(190px,56vw)}}
+
+
+/* Refined data tables across the NovoPay admin workspace */
+.np-admin-data-panel{overflow:hidden}
+.np-admin-table-head{grid-template-columns:repeat(5,minmax(125px,1fr));min-width:850px;gap:14px;padding:14px 22px;font-size:10px;letter-spacing:.55px;line-height:1.5;position:sticky;top:0;z-index:2}
+.np-admin-record-list{overflow-x:auto;overscroll-behavior-x:contain}
+.np-admin-record-row{min-width:850px;grid-template-columns:repeat(5,minmax(125px,1fr));gap:14px;padding:16px 22px;align-items:start;font-size:12px;line-height:1.65}
+.np-admin-record-row span{overflow-wrap:anywhere;word-break:break-word}
+.np-admin-record-row span:first-child{font-weight:800;color:#233752}
+.np-admin-record-row span:nth-child(2){font-weight:600;text-transform:none}
+.np-admin-record-row span:nth-child(3),.np-admin-record-row span:nth-child(4),.np-admin-record-row span:nth-child(5){color:#52637b}
+.np-admin-record-row.has-actions{grid-template-columns:repeat(5,minmax(125px,1fr));min-width:850px}
+.np-admin-row-actions{grid-column:1/-1;padding-top:12px;border-top:1px solid #edf0f5;margin-top:3px}
+.np-admin-data-toolbar{gap:18px}
+.np-admin-search:focus-within{border-color:#8da5ed;box-shadow:0 0 0 3px #4169e10f}
+@media(max-width:760px){.np-admin-table-head{min-width:780px;padding:12px 15px}.np-admin-record-row,.np-admin-record-row.has-actions{min-width:780px;padding:14px 15px;gap:12px}.np-admin-data-toolbar{position:relative}.np-admin-record-list{max-width:100%}}
