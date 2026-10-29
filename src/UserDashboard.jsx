@@ -198,8 +198,10 @@ export default function UserDashboard({ user, onLogout }) {
       const credential = EmailAuthProvider.credential(currentUser.email, currentPassword);
       await reauthenticateWithCredential(currentUser, credential);
 
-      if (emailToChange && emailToChange !== String(currentUser.email || "").toLowerCase()) {
-        await updateEmail(currentUser, emailToChange);
+      if (emailToChange) {
+        if (emailToChange !== String(currentUser.email || "").toLowerCase()) {
+          await updateEmail(currentUser, emailToChange);
+        }
         const token = await currentUser.getIdToken(true);
         const sync = await fetch("/api/user-actions", {
           method: "POST",
