@@ -82,8 +82,11 @@ export default function App() {
       if (mode === "register") {
         const code = sponsorCode.trim().toUpperCase();
         if (!name.trim()) throw new Error("Please enter your full name.");
-        const normalizedMobile = mobile.replace(/\D/g, "");
-        if (normalizedMobile.length < 10 || normalizedMobile.length > 15) throw new Error("Enter 10-digit mobile number, or include country code such as +91.");
+        let normalizedMobile = mobile.replace(/\D/g, "");
+        // Normalize common Indian formats to the same 10-digit number.
+        if (normalizedMobile.length === 12 && normalizedMobile.startsWith("91")) normalizedMobile = normalizedMobile.slice(2);
+        else if (normalizedMobile.length === 11 && normalizedMobile.startsWith("0")) normalizedMobile = normalizedMobile.slice(1);
+        if (normalizedMobile.length < 10 || normalizedMobile.length > 15) throw new Error("Mobile number sahi enter karein: 10 digits, ya +91 ke saath 12 digits.");
         if (!code) throw new Error("Referral ID is required to register.");
         const validationResponse = await fetch("/api/referral-check?code=" + encodeURIComponent(code), { cache: "no-store" });
         const validation = await validationResponse.json().catch(() => ({}));
@@ -92,7 +95,7 @@ export default function App() {
         try {
           if (name.trim()) await updateProfile(credential.user, { displayName: name.trim() });
           const token = await credential.user.getIdToken();
-          const profileResponse = await fetch("/api/user", { method: "POST", headers: { Authorization: "Bearer " + token, "Content-Type": "application/json" }, body: JSON.stringify({ action: "ensure-profile", full_name: name.trim(), mobile: mobile.replace(/\D/g, ""), sponsor_code: code }), cache: "no-store" });
+          const profileResponse = await fetch("/api/user", { method: "POST", headers: { Authorization: "Bearer " + token, "Content-Type": "application/json" }, body: JSON.stringify({ action: "ensure-profile", full_name: name.trim(), mobile: normalizedMobile, sponsor_code: code }), cache: "no-store" });
           const profileResult = await profileResponse.json().catch(() => ({}));
           if (!profileResponse.ok) throw new Error(profileResult.error || "Registration profile could not be created.");
         } catch (profileError) { await deleteUser(credential.user).catch(() => {}); throw profileError; }
