@@ -1,23 +1,64 @@
 import { neon } from "@neondatabase/serverless";
 
 let sql;
+
 export default async function handler(req, res) {
   res.setHeader("Cache-Control", "no-store");
-  if (req.method !== "GET") { res.setHeader("Allow", "GET"); return res.status(405).json({ error: "Method not allowed." }); }
-  const code = String(req.query?.code || "").trim().toUpperCase();
-  if (!code || code.length > 80) return res.status(400).json({ valid: false, error: "Enter a sponsor ID." });
+  res.setHeader("Vary", "Accept");
+  if (req.method !== "GET") {
+    res.setHeader("Allow", "GET");
+    return res.status(405).json({ valid: false, error: "Method not allowed." });
+  }
+
+  const rawCode = req.query?.code;
+  const code = String(Array.isArray(rawCode) ? rawCode[0] : rawCode || "")
+    .trim()
+    .replace(/\s+/g, "")
+    .toUpperCase();
+
+  if (!code || code.length > 80) {
+    return res.status(400).json({ valid: false, error: "Enter a sponsor ID." });
+  }
+
   try {
-    if (!process.env.DATABASE_URL) return res.status(503).json({ valid: false, error: "Registration service is temporarily unavailable." });
-    if (!sql) sql = neon(process.env.DATABASE_URL);
-    if (code === "NA00501") return res.status(200).json({ valid: true, sponsor: { id: "NA00501", name: "NovoPay Finance" } });
-    await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS referral_code text`;
-    if (code === "NA00501") return res.status(200).json({ valid: true, sponsor: { id: "NA00501", name: "NovoPay Finance" } });
-    await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS referral_code text`;
-    const rows = await sql`SELECT novopay_id, COALESCE(NULLIF(full_name, ''), 'NovoPay member') AS sponsor_name FROM users WHERE status = 'active' AND (upper(COALESCE(referral_code, '')) = ${code} OR upper(novopay_id) = ${code}) LIMIT 1`;
-    if (!rows[0]) return res.status(404).json({ valid: false, error: "Referral ID is invalid or inactive." });
-    return res.status(200).json({ valid: true, sponsor: { id: rows[0].novopay_id, name: rows[0].sponsor_name } });
+    const databaseUrl = String(process.env.DATABASE_URL || "").trim();
+    if (!/^postgres(?:ql)?:\/\//i.test(databaseUrl)) {
+      console.error("[NovoPay API] referral check unavailable: DATABASE_URL is missing or invalid");
+      return res.status(503).json({ valid: false, error: "Registration service is temporarily unavailable. Please try again shortly." });
+    }
+
+    if (!sql) sql = neon(databaseUrl);
+
+    if (code === "NA00501") {
+      return res.status(200).json({ valid: true, sponsor: { id: "NA00501", name: "NovoPay Finance" } });
+    }
+
+    const rows = await sql`
+      SELECT novopay_id,
+             COALESCE(NULLIF(BTRIM(full_name), ''), 'NovoPay member') AS sponsor_name
+      FROM users
+      WHERE LOWER(BTRIM(COALESCE(status, ''))) = 'active'
+        AND (
+          UPPER(BTRIM(COALESCE(referral_code, ''))) = ${code}
+          OR UPPER(BTRIM(COALESCE(novopay_id, ''))) = ${code}
+        )
+      ORDER BY CASE WHEN UPPER(BTRIM(COALESCE(referral_code, ''))) = ${code} THEN 0 ELSE 1 END
+      LIMIT 1
+    `;
+
+    if (!rows[0]) {
+      return res.status(404).json({ valid: false, error: "Referral ID is invalid or inactive. Check the ID and try again." });
+    }
+
+    return res.status(200).json({
+      valid: true,
+      sponsor: { id: rows[0].novopay_id, name: rows[0].sponsor_name }
+    });
   } catch (error) {
     console.error("[NovoPay API] referral check failed", { message: error?.message, code: error?.code });
-    return res.status(500).json({ valid: false, error: "Could not verify sponsor ID right now." });
+    return res.status(500).json({
+      valid: false,
+      error: "Could not verify sponsor ID right now. Please try again shortly."
+    });
   }
 }
