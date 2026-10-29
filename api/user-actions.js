@@ -53,6 +53,44 @@ export default async function handler(req, res) {
     }
     const reference = "NP" + randomUUID().replace(/-/g, "").slice(0, 16).toUpperCase();
 
+    if (action === "update-profile") {
+      const rawMobile = String(req.body?.mobile || "").trim();
+      let mobile = rawMobile.replace(/\\D/g, "");
+      if (mobile.length === 12 && mobile.startsWith("91")) mobile = mobile.slice(2);
+      else if (mobile.length === 11 && mobile.startsWith("0")) mobile = mobile.slice(1);
+      if (mobile && !/^\\d{10}$/.test(mobile)) fail("Enter a valid 10-digit mobile number.");
+      if (mobile) {
+        const duplicate = await sql`SELECT novopay_id FROM users
+          WHERE auth_uid <> ${decoded.uid}
+            AND CASE
+              WHEN length(regexp_replace(COALESCE(mobile, ''), '[^0-9]', '', 'g')) = 12
+                AND left(regexp_replace(COALESCE(mobile, ''), '[^0-9]', '', 'g'), 2) = '91'
+                THEN substring(regexp_replace(COALESCE(mobile, ''), '[^0-9]', '', 'g') from 3)
+              WHEN length(regexp_replace(COALESCE(mobile, ''), '[^0-9]', '', 'g')) = 11
+                AND left(regexp_replace(COALESCE(mobile, ''), '[^0-9]', '', 'g'), 1) = '0'
+                THEN substring(regexp_replace(COALESCE(mobile, ''), '[^0-9]', '', 'g') from 2)
+              ELSE regexp_replace(COALESCE(mobile, ''), '[^0-9]', '', 'g')
+            END = ${mobile}
+          LIMIT 1`;
+        if (duplicate[0]) fail("This mobile number is already linked to another account.", 409);
+      }
+      const updated = await sql`UPDATE users SET mobile = ${mobile || null}, updated_at = now()
+        WHERE auth_uid = ${decoded.uid}
+        RETURNING novopay_id, full_name, email, mobile, status, created_at`;
+      if (!updated[0]) fail("Your account profile could not be updated.", 404);
+      return res.status(200).json({ ok: true, message: "Profile details updated.", user: updated[0] });
+    }
+
+    if (action === "sync-email") {
+      const verifiedEmail = String(decoded.email || "").trim().toLowerCase();
+      if (!verifiedEmail) fail("Sign in again after updating your email address.", 401);
+      const updated = await sql`UPDATE users SET email = ${verifiedEmail}, updated_at = now()
+        WHERE auth_uid = ${decoded.uid}
+        RETURNING novopay_id, full_name, email, mobile, status, created_at`;
+      if (!updated[0]) fail("Your account profile could not be updated.", 404);
+      return res.status(200).json({ ok: true, message: "Email address updated.", user: updated[0] });
+    }
+
     if (action === "p2p-transfer") {
       const amount = positiveAmount(req.body?.amount);
       const receiverId = String(req.body?.receiver_id || "").trim().toUpperCase();
