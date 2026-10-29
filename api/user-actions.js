@@ -41,6 +41,41 @@ export default async function handler(req, res) {
     const action = String(req.body?.action || "");
     const reference = "NP" + randomUUID().replace(/-/g, "").slice(0, 16).toUpperCase();
 
+    if (action === "income-to-fund") {
+      const amount = positiveAmount(req.body?.amount);
+      const transferRef = "ITF" + randomUUID().replace(/-/g, "").slice(0, 14).toUpperCase();
+      const moved = await sql`WITH moved AS (
+        UPDATE users
+        SET income_balance = income_balance - ${amount}::numeric,
+            fund_balance = fund_balance + ${amount}::numeric,
+            updated_at = now()
+        WHERE novopay_id = ${profile.novopay_id}
+          AND income_balance >= ${amount}::numeric
+        RETURNING novopay_id
+      ), debit_ledger AS (
+        INSERT INTO ledger_transactions (reference, user_id, type, amount, currency, status, description, idempotency_key)
+        SELECT ${transferRef + "-I"}, novopay_id, 'income_to_fund', -${amount}::numeric, 'USDT', 'posted',
+               'Transfer from Income Wallet to Fund Wallet', ${"income-to-fund:" + transferRef + ":income"}
+        FROM moved RETURNING id
+      ), credit_ledger AS (
+        INSERT INTO ledger_transactions (reference, user_id, type, amount, currency, status, description, idempotency_key)
+        SELECT ${transferRef + "-F"}, novopay_id, 'fund_wallet_transfer', ${amount}::numeric, 'USDT', 'posted',
+               'Transfer into Fund Wallet from Income Wallet', ${"income-to-fund:" + transferRef + ":fund"}
+        FROM moved RETURNING id
+      ), audited AS (
+        INSERT INTO audit_logs (actor_uid, action, entity_type, entity_id, details)
+        SELECT ${decoded.uid}, 'income_to_fund', 'wallet_transfer', ${transferRef},
+               jsonb_build_object('amount', ${amount}::numeric, 'currency', 'USDT')
+        FROM moved RETURNING id
+      )
+      SELECT moved.novopay_id FROM moved
+      CROSS JOIN (SELECT count(*) FROM debit_ledger) debit_guard
+      CROSS JOIN (SELECT count(*) FROM credit_ledger) credit_guard
+      CROSS JOIN (SELECT count(*) FROM audited) audit_guard`;
+      if (!moved.length) fail("Insufficient Income Wallet balance.", 409);
+      return res.status(200).json({ ok: true, message: "Income transferred to Fund Wallet successfully.", record: { reference: transferRef, amount, currency: "USDT", status: "posted" } });
+    }
+
     if (action === "deposit-request") {
       const amount = positiveAmount(req.body?.amount);
       const txHash = String(req.body?.tx_hash || "").trim();
