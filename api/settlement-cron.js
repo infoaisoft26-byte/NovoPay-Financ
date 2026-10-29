@@ -186,14 +186,15 @@ export default async function handler(req, res) {
       ), audit AS (
         INSERT INTO audit_logs (actor_uid, action, entity_type, entity_id, details)
         SELECT 'system:settlement-cron', 'daily_roi_settlement', 'settlement', ${settlementDate},
-               jsonb_build_object('credited_entries', (SELECT count(*) FROM credited),
-                                  'credited_amount', COALESCE((SELECT SUM(amount) FROM credited), 0),
+               jsonb_build_object('credited_entries', (SELECT count(*) FROM credited) + (SELECT count(*) FROM level_credited),
+                                  'roi_amount', COALESCE((SELECT SUM(amount) FROM credited), 0),
+                                  'roi_level_amount', COALESCE((SELECT SUM(amount) FROM level_credited), 0),
                                   'users_updated', (SELECT count(*) FROM balance_updates))
         RETURNING id
       )
       SELECT ${settlementDate} AS settlement_date,
-             (SELECT count(*) FROM credited)::int AS credited_entries,
-             COALESCE((SELECT SUM(amount) FROM credited), 0)::text AS credited_amount,
+             (SELECT count(*) FROM credited)::int + (SELECT count(*) FROM level_credited)::int AS credited_entries,
+             (COALESCE((SELECT SUM(amount) FROM credited), 0) + COALESCE((SELECT SUM(amount) FROM level_credited), 0))::text AS credited_amount,
              (SELECT count(*) FROM balance_updates)::int AS users_updated
       FROM audit
     `;
