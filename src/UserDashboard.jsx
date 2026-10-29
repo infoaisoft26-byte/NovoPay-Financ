@@ -252,6 +252,13 @@ export default function UserDashboard({ user, onLogout }) {
                   <CapValue label="Remaining cap" value={money(data?.capping?.remainingCap ?? 0)} />
                 </div>
               </section>
+              <div className="np-user-stats np-user-overview-stats">
+                <Stat icon={Wallet} label="Fund Wallet" value={profile ? money(profile.fund_balance) : "—"} tone="blue" />
+                <Stat icon={Activity} label="Income Wallet" value={profile ? money(profile.income_balance) : "—"} tone="green" />
+                <Stat icon={Layers3} label="Total Investment" value={money(data?.incomeSummary?.totalInvestment ?? data?.capping?.recordedInvestment ?? 0)} tone="violet" />
+                <Stat icon={CreditCard} label="Total Credited Income" value={money(data?.incomeSummary?.totalIncome ?? data?.capping?.countedIncome ?? 0)} tone="amber" />
+                <Stat icon={Package} label="Active Packages" value={String(data?.summary?.activePackages ?? 0)} tone="blue" />
+              </div>
               <section className="np-user-panel np-user-referral-overview">
                 <PanelTitle title="Your Referral Link" subtitle="Share your NovoPay referral link with new members." />
                 <div className="np-user-referral-code">{profile?.referral_code || profile?.novopay_id || "Loading…"}</div>
@@ -379,22 +386,25 @@ function Empty({ title, message }) {
 function Records({ rows, type, loading }) {
   if (loading) return <Loading />;
   if (!rows?.length) return <Empty title="No records yet" message="There are no verified records to display for this section." />;
+  const incomeSections = ["income-all", "basic-roi", "basic-referral", "basic-level", "fd-roi", "fd-referral", "fd-level", "salary"];
   const columns = ["direct-team", "team-list"].includes(type)
-    ? [["novopay_id", "NovoPay ID"], ["full_name", "Member"], ["status", "Status"], ["level", "Level"], ["created_at", "Joined"]]
+    ? [["novopay_id", "NovoPay ID"], ["full_name", "Member"], ["email", "Email"], ["status", "Status"], ["level", "Level"], ["created_at", "Joined"]]
     : type === "reports"
     ? [["name", "Report"], ["value", "Value"]]
     : type === "referrals"
-    ? [["reference", "Reward Ref"], ["referred_user_id", "Member ID"], ["basis_amount", "Package Amount"], ["amount", "Reward"], ["status", "Status"], ["created_at", "Date"]]
+    ? [["created_at", "Date & Time"], ["referred_user_id", "Source Member ID"], ["reference", "Income Ref"], ["basis_amount", "Package Amount"], ["rate", "Rate"], ["amount", "Income (USDT)"], ["status", "Status"]]
     : type === "activations"
-    ? [["reference", "Reference"], ["package_name", "Package"], ["amount", "Amount"], ["status", "Status"], ["activated_at", "Activated"]]
+    ? [["activated_at", "Date & Time"], ["reference", "Activation Ref"], ["package_name", "Package"], ["amount", "Amount (USDT)"], ["status", "Status"]]
     : type === "deposits"
-    ? [["reference", "Reference"], ["amount", "Amount"], ["status", "Status"], ["created_at", "Created"]]
+    ? [["created_at", "Date & Time"], ["reference", "Deposit Ref"], ["tx_hash", "BSC TX Hash"], ["amount", "Amount (USDT)"], ["status", "Status"]]
     : type === "withdrawals"
-      ? [["reference", "Reference"], ["amount", "Amount"], ["net_amount", "Net amount"], ["status", "Status"], ["created_at", "Created"]]
+      ? [["created_at", "Date & Time"], ["reference", "Withdrawal Ref"], ["amount", "Requested (USDT)"], ["fee", "Fee"], ["net_amount", "Net (USDT)"], ["status", "Status"]]
       : type === "support"
-        ? [["reference", "Ticket"], ["subject", "Subject"], ["status", "Status"], ["created_at", "Created"]]
+        ? [["created_at", "Date & Time"], ["reference", "Ticket"], ["subject", "Subject"], ["status", "Status"]]
         : type === "p2p"
-          ? [["reference", "Reference"], ["receiver_user_id", "Recipient"], ["amount", "Amount"], ["status", "Status"], ["created_at", "Created"]]
-          : [["reference", "Reference"], ["type", "Type"], ["amount", "Amount"], ["status", "Status"], ["created_at", "Date"]];
-  return <div className="np-user-table-wrap"><table className="np-user-table"><thead><tr>{columns.map(([key, label]) => <th key={key}>{label}</th>)}</tr></thead><tbody>{rows.map((row, i) => <tr key={row.id || row.reference || i}>{columns.map(([key]) => <td key={key}>{key === "amount" || key === "net_amount" ? money(row[key]) : (key === "created_at" || key === "activated_at") ? date(row[key]) : key === "status" ? <span className={`np-user-status ${statusClass(row[key])}`}>{row[key] || "unknown"}</span> : <span className={key === "reference" ? "np-user-ref" : ""}>{row[key] ?? "—"}</span>}</td>)}</tr>)}</tbody></table></div>;
+          ? [["created_at", "Date & Time"], ["reference", "Transfer Ref"], ["sender_user_id", "Sender ID"], ["receiver_user_id", "Recipient ID"], ["amount", "Amount (USDT)"], ["status", "Status"]]
+          : incomeSections.includes(type)
+            ? [["created_at", "Date & Time"], ["source_member_id", "Source Member ID"], ["type", "Income Type"], ["description", "Income Description"], ["amount", "Amount (USDT)"], ["status", "Status"]]
+            : [["created_at", "Date & Time"], ["reference", "Ledger Ref"], ["type", "Transaction Type"], ["description", "Description"], ["amount", "Amount (USDT)"], ["status", "Status"]];
+  return <div className="np-user-table-wrap"><table className="np-user-table"><thead><tr>{columns.map(([key, label]) => <th key={key}>{label}</th>)}</tr></thead><tbody>{rows.map((row, i) => <tr key={row.id || row.reference || i}>{columns.map(([key]) => <td key={key}>{["amount", "net_amount", "fee", "basis_amount"].includes(key) ? money(row[key]) : key === "rate" ? (row[key] == null ? "—" : `${(Number(row[key]) * (Number(row[key]) <= 1 ? 100 : 1)).toFixed(2)}%`) : (key === "created_at" || key === "activated_at") ? date(row[key]) : key === "status" ? <span className={`np-user-status ${statusClass(row[key])}`}>{row[key] || "unknown"}</span> : <span className={["reference", "source_member_id", "novopay_id"].includes(key) ? "np-user-ref" : ""}>{row[key] ?? "—"}</span>}</td>)}</tr>)}</tbody></table></div>;
 }
