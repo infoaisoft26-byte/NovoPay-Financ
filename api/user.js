@@ -186,7 +186,7 @@ export default async function handler(req, res) {
         END = ${normalizedMobile}
         LIMIT 1` : [];
       if (duplicateMobile[0]) return res.status(409).json({ error: "This mobile number is already registered. Please sign in to your existing account." });
-      const sponsorRows = sponsorCode === "NA00501" ? [{ novopay_id: "NA00501" }] : await db`SELECT novopay_id FROM users WHERE status = 'active' AND (upper(COALESCE(referral_code, '')) = ${sponsorCode} OR upper(novopay_id) = ${sponsorCode}) LIMIT 1`;
+      const sponsorRows = await db`SELECT novopay_id FROM users WHERE status = 'active' AND (upper(BTRIM(COALESCE(referral_code, ''))) = ${sponsorCode} OR upper(BTRIM(novopay_id)) = ${sponsorCode}) LIMIT 1`;
       if (!sponsorRows[0]) return res.status(400).json({ error: "Referral ID is invalid or inactive. Check the ID and try again." });
       const generatedId = "NP" + randomUUID().replace(/-/g, "").slice(0, 18).toUpperCase();
       await db`CREATE SEQUENCE IF NOT EXISTS novopay_referral_seq START WITH 503 INCREMENT BY 1`;
