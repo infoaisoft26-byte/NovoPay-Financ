@@ -55,20 +55,97 @@ export default async function handler(req, res) {
         RETURNING d.reference,d.user_id,d.amount,d.currency,d.tx_hash
       ), credited AS (
         UPDATE users u SET fund_balance=u.fund_balance+c.amount, updated_at=now()
-        FROM changed c WHERE u.novopay_id=c.user_id RETURNING c.reference,c.user_id,c.amount,c.currency,c.tx_hash
+        FROM changed c WHERE u.novopay_id=c.user_id
+        RETURNING c.reference,c.user_id,c.amount,c.currency,c.tx_hash
+      ), deposit_kind AS (
+        SELECT c.*,
+          CASE WHEN EXISTS (
+            SELECT 1 FROM deposits previous
+            WHERE previous.user_id=c.user_id AND previous.reference<>c.reference
+              AND lower(previous.status) IN ('approved','completed','credited')
+          ) THEN 'retopup' ELSE 'joining' END AS income_kind
+        FROM credited c
+      ), sponsor_chain(source_ref, source_user_id, basis_amount, income_kind, level, sponsor_id, next_sponsor_id) AS (
+        SELECT d.reference,d.user_id,d.amount,d.income_kind,1,sponsor.novopay_id,sponsor.sponsor_user_id
+        FROM deposit_kind d
+        JOIN users downline ON downline.novopay_id=d.user_id
+        JOIN users sponsor ON sponsor.novopay_id=downline.sponsor_user_id AND lower(sponsor.status)='active'
+        UNION ALL
+        SELECT chain.source_ref,chain.source_user_id,chain.basis_amount,chain.income_kind,chain.level+1,
+          sponsor.novopay_id,sponsor.sponsor_user_id
+        FROM sponsor_chain chain
+        JOIN users sponsor ON sponsor.novopay_id=chain.next_sponsor_id AND lower(sponsor.status)='active'
+        WHERE chain.level<15 AND chain.next_sponsor_id IS NOT NULL
+      ), sponsor_caps AS (
+        SELECT u.novopay_id AS user_id,
+          GREATEST(0,COALESCE(SUM(a.amount),0)::numeric*5-COALESCE((
+            SELECT SUM(l.amount) FROM ledger_transactions l
+            WHERE l.user_id=u.novopay_id AND l.amount>0
+              AND lower(l.status) IN ('posted','completed','approved','paid')
+              AND (lower(l.type) LIKE '%income%' OR lower(l.type) LIKE '%roi%'
+                OR lower(l.type) LIKE '%level%' OR lower(l.type) LIKE '%joining%'
+                OR lower(l.type) LIKE '%retopup%' OR lower(l.type) LIKE '%bonus%'
+                OR lower(l.type) LIKE '%principal_return%')
+          ),0)) AS cap_remaining,
+          EXISTS (SELECT 1 FROM package_activations active_a
+            WHERE active_a.user_id=u.novopay_id AND lower(active_a.status)='active') AS has_active_package
+        FROM users u
+        LEFT JOIN package_activations a ON a.user_id=u.novopay_id
+          AND lower(a.status) IN ('active','completed','approved')
+        GROUP BY u.novopay_id
+      ), commission_raw AS (
+        SELECT chain.*,caps.cap_remaining,
+          round(chain.basis_amount * CASE
+            WHEN chain.income_kind='joining' AND chain.level=1 THEN 0.05
+            WHEN chain.income_kind='retopup' AND chain.level=1 THEN 0.01
+            ELSE 0.0025 END,8) AS proposed_amount
+        FROM sponsor_chain chain
+        JOIN sponsor_caps caps ON caps.user_id=chain.sponsor_id
+        WHERE caps.has_active_package
+          AND NOT EXISTS (SELECT 1 FROM ledger_transactions existing
+            WHERE existing.idempotency_key='deposit-level:'||chain.source_ref||':L'||chain.level::text)
+      ), commission_ranked AS (
+        SELECT commission_raw.*,
+          SUM(proposed_amount) OVER (PARTITION BY sponsor_id ORDER BY source_ref,level
+            ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) AS cumulative_commission
+        FROM commission_raw
+      ), commission_bounded AS (
+        SELECT commission_ranked.*,
+          LEAST(proposed_amount,GREATEST(0,cap_remaining-(cumulative_commission-proposed_amount))) AS credit_amount
+        FROM commission_ranked
+      ), commission_ledger AS (
+        INSERT INTO ledger_transactions(reference,user_id,type,amount,currency,status,description,idempotency_key)
+        SELECT 'DLI'||md5(source_ref||':L'||level::text),sponsor_id,
+          CASE WHEN income_kind='joining' THEN 'joining_income' ELSE 'retopup_income' END,
+          credit_amount,'USDT','posted',
+          'Level '||level::text||' '||income_kind||' income from '||source_user_id||' deposit '||source_ref,
+          'deposit-level:'||source_ref||':L'||level::text
+        FROM commission_bounded WHERE credit_amount>0
+        ON CONFLICT (idempotency_key) DO NOTHING
+        RETURNING user_id,amount,reference
+      ), sponsor_credit AS (
+        UPDATE users sponsor SET income_balance=sponsor.income_balance+totals.amount,updated_at=now()
+        FROM (SELECT user_id,SUM(amount)::numeric AS amount FROM commission_ledger GROUP BY user_id) totals
+        WHERE sponsor.novopay_id=totals.user_id
+        RETURNING sponsor.novopay_id
       ), ledger AS (
         INSERT INTO ledger_transactions(reference,user_id,type,amount,currency,status,description,idempotency_key)
         SELECT 'NP-DEP-'||reference,user_id,'deposit_credit',amount,currency,'posted',
-          'Admin approved verified USDT deposit ('||tx_hash||')','deposit-credit:'||reference FROM credited
-        RETURNING id
+          'Admin approved verified USDT deposit ('||tx_hash||')','deposit-credit:'||reference
+        FROM credited RETURNING id
       ), audit AS (
         INSERT INTO audit_logs(actor_uid,action,entity_type,entity_id,details)
         SELECT ${actor.uid},'deposit_approved','deposit',reference,
-          jsonb_build_object('user_id',user_id,'amount',amount,'currency',currency,'tx_hash',tx_hash)
+          jsonb_build_object('user_id',user_id,'amount',amount,'currency',currency,'tx_hash',tx_hash,
+            'deposit_income_kind',(SELECT income_kind FROM deposit_kind LIMIT 1),
+            'level_commissions',(SELECT count(*) FROM commission_ledger))
         FROM credited RETURNING id
-      ) SELECT credited.reference,credited.user_id,credited.amount,credited.currency FROM credited
-      CROSS JOIN (SELECT count(*) FROM ledger) ledger_guard
-      CROSS JOIN (SELECT count(*) FROM audit) audit_guard`;
+      ) SELECT credited.reference,credited.user_id,credited.amount,credited.currency,
+          (SELECT count(*) FROM commission_ledger)::int AS level_commissions
+        FROM credited
+        CROSS JOIN (SELECT count(*) FROM ledger) ledger_guard
+        CROSS JOIN (SELECT count(*) FROM audit) audit_guard
+        CROSS JOIN (SELECT count(*) FROM sponsor_credit) sponsor_guard`;
     } else if (action === "deposit-reject" && reference) {
       result = await db`WITH changed AS (
         UPDATE deposits SET status='rejected', reviewed_at=now(), reviewer_uid=${actor.uid}
