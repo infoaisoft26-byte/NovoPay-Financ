@@ -264,8 +264,8 @@ export default async function handler(req, res) {
         INSERT INTO referral_commissions (reference, sponsor_user_id, referred_user_id, package_activation_ref, basis_amount, rate, amount, currency, status, level)
         SELECT ${"RC" + purchaseRef + "L"} || chain.level::text,
                chain.sponsor_id, created.user_id, created.reference, created.amount,
-               CASE WHEN chain.level = 1 THEN 0.07 ELSE 0.01 END,
-               round(created.amount * CASE WHEN chain.level = 1 THEN 0.07 ELSE 0.01 END, 8),
+               CASE WHEN chain.level = 1 THEN 0.05 ELSE 0.01 END,
+               round(created.amount * CASE WHEN chain.level = 1 THEN 0.05 ELSE 0.01 END, 8),
                created.currency, 'posted', chain.level
         FROM created CROSS JOIN sponsor_chain chain
         ON CONFLICT (package_activation_ref, level) DO NOTHING
@@ -281,7 +281,7 @@ export default async function handler(req, res) {
                sponsor_credit.novopay_id,
                CASE WHEN sponsor_credit.level = 1 THEN 'referral_income' WHEN lower(COALESCE(pkg.package_type, '')) = 'basic' THEN 'basic_level_income' WHEN lower(COALESCE(pkg.package_type, '')) = 'fd' THEN 'fd_level_income' ELSE 'level_income' END,
                sponsor_credit.amount, sponsor_credit.currency, 'posted',
-               CASE WHEN sponsor_credit.level = 1 THEN 'Level 1 direct referral income (7%) for package activation ' ELSE 'Level ' || sponsor_credit.level::text || ' income (1%) from ' || COALESCE(pkg.package_type, 'package') || ' package activation ' END || ${purchaseRef},
+               CASE WHEN sponsor_credit.level = 1 THEN 'Level 1 direct referral income (5%) for package activation ' ELSE 'Level ' || sponsor_credit.level::text || ' income (1%) from ' || COALESCE(pkg.package_type, 'package') || ' package activation ' END || ${purchaseRef},
                ${"referral:" + purchaseRef + ":L"} || sponsor_credit.level::text
         FROM sponsor_credit
         JOIN package_activations pa ON pa.reference = sponsor_credit.package_activation_ref
