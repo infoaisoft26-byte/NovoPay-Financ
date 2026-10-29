@@ -49,3 +49,18 @@
 .np-user-referral-copy{display:inline-flex;align-items:center;justify-content:center;gap:8px;margin-top:12px;min-height:40px;padding:10px 14px;border:0;border-radius:10px;background:linear-gradient(120deg,#c99a35,#f1d58b);color:#17130b;font-weight:750;cursor:pointer}
 .np-user-referral-copy:disabled{opacity:.55;cursor:wait}
 .np-user-referral-message{margin:10px 0 0;color:var(--np-text,#e8edf7);font-size:13px}
+
+
+/* Grouped Global-Finance-style member navigation */
+.np-user-nav-group{margin:0 0 15px}
+.np-user-nav-group-title{margin:0 9px 7px;color:#8090aa;font-size:9px;font-weight:800;letter-spacing:1.25px}
+.np-user-nav-group button{width:100%}
+.np-user-deposit-address-card{display:flex;align-items:center;justify-content:space-between;gap:16px;margin:0 0 22px;padding:18px;border:1px solid #dbe4f3;border-radius:14px;background:linear-gradient(135deg,#f8fbff,#eef4ff)}
+.np-user-deposit-address-card>div{min-width:0}
+.np-user-deposit-address-card b{display:block;font-size:14px;color:#172944}
+.np-user-deposit-address-card p{margin:8px 0;overflow-wrap:anywhere;font-weight:700;color:#244a91}
+.np-user-deposit-address-card small{color:#687b98}
+.np-user-deposit-address-card button,.np-user-primary-link{display:inline-flex;align-items:center;justify-content:center;gap:8px;border:0;border-radius:10px;background:#315fd4;color:white;padding:11px 14px;font-weight:700;text-decoration:none;white-space:nowrap;cursor:pointer}
+.np-user-deposit-address-card button:disabled{opacity:.5;cursor:not-allowed}
+.np-user-primary-link{width:max-content}
+@media(max-width:600px){.np-user-deposit-address-card{align-items:stretch;flex-direction:column}.np-user-deposit-address-card button{width:100%}.np-user-primary-link{width:100%;box-sizing:border-box}}
