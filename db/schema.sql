@@ -6,6 +6,9 @@ CREATE TABLE IF NOT EXISTS users (
   novopay_id text NOT NULL UNIQUE,
   full_name text NOT NULL,
   email text NOT NULL UNIQUE,
+  mobile text,
+  referral_code text UNIQUE,
+  sponsor_user_id text,
   status text NOT NULL DEFAULT 'active' CHECK (status IN ('active','suspended','closed')),
   fund_balance numeric(20,8) NOT NULL DEFAULT 0 CHECK (fund_balance >= 0),
   income_balance numeric(20,8) NOT NULL DEFAULT 0 CHECK (income_balance >= 0),
@@ -144,6 +147,7 @@ CREATE TABLE IF NOT EXISTS offer_posters (
   created_at timestamptz NOT NULL DEFAULT now()
 );
 
+CREATE UNIQUE INDEX IF NOT EXISTS users_mobile_unique_idx ON users ((regexp_replace(mobile, '[^0-9]', '', 'g'))) WHERE mobile IS NOT NULL AND mobile <> '';
 CREATE INDEX IF NOT EXISTS deposits_status_created_idx ON deposits(status, created_at DESC);
 CREATE INDEX IF NOT EXISTS withdrawals_status_created_idx ON withdrawals(status, created_at DESC);
 CREATE INDEX IF NOT EXISTS ledger_user_created_idx ON ledger_transactions(user_id, created_at DESC);
