@@ -154,3 +154,8 @@
 .np-admin-settings-savebar .np-admin-action-button{padding:12px 18px;font-size:12px}
 @media(max-width:900px){.np-admin-commission-grid{grid-template-columns:repeat(3,minmax(0,1fr))}}
 @media(max-width:600px){.np-admin-settings-body{padding:12px}.np-admin-settings-card{padding:15px}.np-admin-settings-grid{grid-template-columns:1fr}.np-admin-settings-grid .wide{grid-column:auto}.np-admin-commission-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.np-admin-settings-savebar{align-items:stretch;flex-direction:column;padding:13px}.np-admin-settings-savebar button{width:100%}}
+
+/* Clean NovoPay account footer branding */
+.np-auth-footer strong{font-weight:800;color:#34435a;letter-spacing:.1px}
+.np-auth-footer span:last-child{display:flex;align-items:center;gap:4px}
+@media(max-width:480px){.np-auth-footer{justify-content:center;text-align:center}.np-auth-footer span{width:100%;justify-content:center}}
