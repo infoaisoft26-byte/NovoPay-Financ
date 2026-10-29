@@ -234,3 +234,23 @@ html,body,#root{width:100%;min-width:0;max-width:100%;margin:0}
   .np-user-stat, .np-user-package, .np-user-package-summary, .np-user-nav button,
   .np-user-action-form button, .np-user-primary-link, .np-user-action-form input { transition: none !important; }
 }
+
+
+/* Consistent, readable member tables: finance-style spacing, responsive overflow and clear statuses */
+.np-user-table-wrap{width:100%;max-width:100%;overflow-x:auto;overscroll-behavior-x:contain;border:1px solid #e5eaf2;border-radius:12px;background:#fff}
+.np-user-table{width:100%;min-width:720px;border-collapse:separate;border-spacing:0;background:#fff;font-size:12px;line-height:1.55}
+.np-user-table thead{position:sticky;top:0;z-index:1}
+.np-user-table th{padding:14px 16px;background:#f5f7fb;color:#687891;text-align:left;font-size:10px;font-weight:800;letter-spacing:.55px;text-transform:uppercase;white-space:nowrap;border-bottom:1px solid #e3e9f2}
+.np-user-table td{padding:14px 16px;color:#33445d;vertical-align:middle;border-bottom:1px solid #edf0f5;overflow-wrap:anywhere}
+.np-user-table tbody tr:nth-child(even){background:#fbfcfe}
+.np-user-table tbody tr:hover{background:#f2f6ff}
+.np-user-table tbody tr:last-child td{border-bottom:0}
+.np-user-table td:first-child{font-weight:700;color:#233751}
+.np-user-table .np-user-status{white-space:nowrap}
+.np-user-panel{min-width:0}
+.np-user-panel .np-basic-history-toolbar{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.np-user-panel .np-user-search{max-width:100%}
+.np-user-table-wrap::-webkit-scrollbar{height:8px}
+.np-user-table-wrap::-webkit-scrollbar-thumb{background:#c7d1e1;border-radius:999px}
+.np-user-table-wrap::-webkit-scrollbar-track{background:#f2f5fa}
+@media(max-width:640px){.np-user-table{min-width:680px;font-size:11px}.np-user-table th{padding:12px 13px;font-size:9px}.np-user-table td{padding:12px 13px}.np-user-table-wrap{border-radius:10px}.np-user-panel .np-basic-history-toolbar{align-items:stretch;flex-direction:column}.np-user-panel .np-user-search{width:100%}}
