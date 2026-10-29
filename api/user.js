@@ -189,8 +189,8 @@ export default async function handler(req, res) {
       const sponsorRows = sponsorCode === "NA00501" ? [{ novopay_id: "NA00501" }] : await db`SELECT novopay_id FROM users WHERE status = 'active' AND (upper(COALESCE(referral_code, '')) = ${sponsorCode} OR upper(novopay_id) = ${sponsorCode}) LIMIT 1`;
       if (!sponsorRows[0]) return res.status(400).json({ error: "Referral ID is invalid or inactive. Check the ID and try again." });
       const generatedId = "NP" + randomUUID().replace(/-/g, "").slice(0, 18).toUpperCase();
-      await db`CREATE SEQUENCE IF NOT EXISTS novopay_referral_seq START WITH 502 INCREMENT BY 1`;
-      const referralRows = await db`SELECT 'NA' || lpad(nextval('novopay_referral_seq')::text, 5, '0') AS referral_code`;
+      await db`CREATE SEQUENCE IF NOT EXISTS novopay_referral_seq START WITH 503 INCREMENT BY 1`;
+      const referralRows = await db`SELECT 'NP' || lpad(nextval('novopay_referral_seq')::text, 6, '0') AS referral_code`;
       const generatedReferral = referralRows[0].referral_code;
       const rows = await db`INSERT INTO users (auth_uid, novopay_id, referral_code, sponsor_user_id, full_name, email, mobile)
         VALUES (${decoded.uid}, ${generatedId}, ${generatedReferral}, ${sponsorRows[0].novopay_id}, ${displayName}, ${email}, ${mobile})
@@ -201,7 +201,47 @@ export default async function handler(req, res) {
           referral_code = COALESCE(NULLIF(users.referral_code, ''), EXCLUDED.referral_code),
           updated_at = now()
         RETURNING id, auth_uid, novopay_id, full_name, email, mobile, status, fund_balance, income_balance, referral_code, sponsor_user_id, created_at`;
-      return res.status(200).json({ ok: true, user: rows[0] });
+      const newUser = rows[0];
+      // Pay the direct sponsor exactly once for each newly created member. The unique
+      // registration reference and idempotency key prevent duplicate credits on retries.
+      await db`WITH commission AS (
+          INSERT INTO referral_commissions
+            (reference, sponsor_user_id, referred_user_id, package_activation_ref, basis_amount, rate, amount, currency, status, level)
+          VALUES (
+            ${"REGREF-" + newUser.novopay_id},
+            ${sponsorRows[0].novopay_id},
+            ${newUser.novopay_id},
+            ${"REG-" + newUser.novopay_id},
+            0, 0, 0.50, 'USDT', 'posted', 1
+          )
+          ON CONFLICT (package_activation_ref, level) DO NOTHING
+          RETURNING sponsor_user_id, referred_user_id, amount, reference
+        ), wallet_credit AS (
+          UPDATE users AS sponsor
+          SET income_balance = sponsor.income_balance + commission.amount,
+              updated_at = now()
+          FROM commission
+          WHERE sponsor.novopay_id = commission.sponsor_user_id
+          RETURNING sponsor.novopay_id
+        ), ledger_credit AS (
+          INSERT INTO ledger_transactions
+            (reference, user_id, type, amount, currency, status, description, idempotency_key)
+          SELECT
+            commission.reference,
+            commission.sponsor_user_id,
+            'registration_referral_bonus',
+            commission.amount,
+            'USDT',
+            'posted',
+            'Registration referral bonus for ' || commission.referred_user_id,
+            'registration-referral-bonus:' || commission.referred_user_id
+          FROM commission
+          ON CONFLICT (idempotency_key) DO NOTHING
+          RETURNING id
+        )
+        SELECT (SELECT count(*) FROM wallet_credit) AS wallets_credited,
+               (SELECT count(*) FROM ledger_credit) AS ledger_entries`;
+      return res.status(200).json({ ok: true, user: newUser });
     }
 
     if (req.method !== "GET") {
