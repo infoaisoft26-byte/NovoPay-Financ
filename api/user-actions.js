@@ -38,7 +38,19 @@ export default async function handler(req, res) {
   try {
     const { auth, sql } = services();
     const { decoded, profile } = await userFor(req, auth, sql);
+    await sql`CREATE TABLE IF NOT EXISTS system_settings (setting_key text PRIMARY KEY, setting_value jsonb NOT NULL DEFAULT '{}'::jsonb, updated_at timestamptz NOT NULL DEFAULT now(), updated_by text)`;
+    const platformRows = await sql`SELECT setting_value FROM system_settings WHERE setting_key='platform' LIMIT 1`;
+    const platform = platformRows[0]?.setting_value || {};
     const action = String(req.body?.action || "");
+    if (platform.maintenanceMode === true) fail("NovoPay Finance is temporarily under maintenance. Please try again later.", 503);
+    if (action === "deposit-request" && platform.depositVisible === false) fail("USDT recharge is temporarily unavailable.", 403);
+    if (action === "withdrawal-request" && platform.enforceWithdrawalTiming !== false) {
+      const parts = new Intl.DateTimeFormat("en-GB", { timeZone: "Asia/Kolkata", hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).formatToParts(new Date());
+      const hour = Number(parts.find(part => part.type === "hour")?.value || 0);
+      const minute = Number(parts.find(part => part.type === "minute")?.value || 0);
+      const currentMinutes = hour * 60 + minute;
+      if (currentMinutes < 630 || currentMinutes > 930) fail("Withdrawals are available only from 10:30 AM to 3:30 PM IST.", 403);
+    }
     const reference = "NP" + randomUUID().replace(/-/g, "").slice(0, 16).toUpperCase();
 
     if (action === "p2p-transfer") {
