@@ -240,6 +240,8 @@ export default async function handler(req, res) {
                CASE WHEN sponsor_credit.level = 1 THEN 'Level 1 direct referral income (7%) for package activation ' ELSE 'Level ' || sponsor_credit.level::text || ' income (1%) from ' || COALESCE(pkg.package_type, 'package') || ' package activation ' END || ${purchaseRef},
                ${"referral:" + purchaseRef + ":L"} || sponsor_credit.level::text
         FROM sponsor_credit
+        JOIN package_activations pa ON pa.reference = sponsor_credit.package_activation_ref
+        JOIN packages pkg ON pkg.id = pa.package_id
         ON CONFLICT (idempotency_key) DO NOTHING
         RETURNING id
       ), ledger AS (
