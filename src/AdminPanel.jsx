@@ -92,7 +92,7 @@ function recordCells(section, row) {
   switch (section) {
     case "Users": return [row.novopay_id || row.id || "—", row.full_name || "Member", row.email || "—", row.status || "unknown", "Fund " + amount(row.fund_balance) + " · Income " + amount(row.income_balance)];
     case "KYC Approvals": return [row.reference || row.id || "—", row.user_id || "—", row.document_type || "Document", row.status || "pending", stamp(row.created_at || row.reviewed_at)];
-    case "Deposits": return [row.reference || "—", row.user_id || "—", amount(row.amount, row.currency), row.status || "pending", row.tx_hash || "TX hash not submitted"];
+    case "Deposits": return [row.reference || "—", row.user_id || "—", amount(row.amount, row.currency), row.status || "pending", row.blockchain_verified ? "Blockchain verified · Ready for approval" : "Awaiting blockchain verification", row.tx_hash || "TX hash not submitted"];
     case "Withdrawals": return [row.reference || "—", row.user_id || "—", amount(row.amount, row.currency), "Fee " + amount(row.fee, row.currency) + " · Net " + amount(row.net_amount, row.currency), row.status || "pending"];
     case "Transactions": return [row.reference || "—", row.user_id || "—", row.type || "—", amount(row.amount, row.currency), row.status || "—"];
     case "P2P Transfers": return [row.reference || "—", row.sender_user_id || "—", row.receiver_user_id || "—", amount(row.amount, row.currency), row.status || "—"];
@@ -114,7 +114,7 @@ function recordCells(section, row) {
 const tableColumns = {
   Users: ["NOVOPAY ID", "MEMBER NAME", "EMAIL", "ACCOUNT STATUS", "WALLET BALANCES"],
   "KYC Approvals": ["SUBMISSION ID", "USER ID", "DOCUMENT", "REVIEW STATUS", "SUBMITTED / REVIEWED"],
-  Deposits: ["DEPOSIT REF", "USER ID", "AMOUNT", "STATUS", "BLOCKCHAIN TX HASH"],
+  Deposits: ["DEPOSIT REF", "USER ID", "AMOUNT", "STATUS", "BLOCKCHAIN VERIFICATION", "BLOCKCHAIN TX HASH"],
   Withdrawals: ["WITHDRAWAL REF", "USER ID", "REQUESTED", "FEE / NET PAYABLE", "STATUS"],
   Transactions: ["LEDGER REF", "USER ID", "TRANSACTION TYPE", "AMOUNT", "STATUS"],
   "P2P Transfers": ["TRANSFER REF", "SENDER ID", "RECEIVER ID", "AMOUNT", "STATUS"],
