@@ -316,7 +316,7 @@ export default async function handler(req, res) {
       const levelIncome = { roi: {}, joining: {}, retopup: {} };
       for (const row of incomeLedger) {
         const type = String(row.type || '').toLowerCase(), desc = String(row.description || '').toLowerCase(), label = type + ' ' + desc;
-        const category = label.includes('retopup') || label.includes('re-topup') ? 'retopup' : (label.includes('joining') || label.includes('first deposit') || label.includes('new deposit')) ? 'joining' : (label.includes('roi') ? 'roi' : '');
+        const category = label.includes('retopup') || label.includes('re-topup') ? 'retopup' : (label.includes('joining') || label.includes('first deposit') || label.includes('new deposit')) ? 'joining' : ((label.includes('roi') || type.includes('level_income') || type === 'level_income' || type === 'basic_level_income' || type === 'fd_level_income') ? 'roi' : '');
         const match = label.match(/(?:level|\bl)\s*[-:#]?\s*(\d{1,2})/i);
         const level = match ? Number(match[1]) : null;
         if (category && level >= 1 && level <= 15 && ['posted','completed','approved','paid'].includes(String(row.status || '').toLowerCase())) {
