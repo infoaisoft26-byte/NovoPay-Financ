@@ -199,7 +199,7 @@ export default function App() {
     );
   }
 
-  return <AuthScreen {...{ mode, setMode, name, setName, email, setEmail, password, setPassword, showPassword, setShowPassword, busy, notice, setNotice, handleSubmit, handleReset, navigate, isAdminPath }} />;
+  return <AuthScreen {...{ mode, setMode, name, setName, mobile, setMobile, sponsorCode, setSponsorCode, email, setEmail, password, setPassword, showPassword, setShowPassword, busy, notice, setNotice, handleSubmit, handleReset, navigate, isAdminPath }} />;
 }
 
 function AuthScreen({ mode, setMode, name, setName, mobile, setMobile, sponsorCode, setSponsorCode, email, setEmail, password, setPassword, showPassword, setShowPassword, busy, notice, setNotice, handleSubmit, handleReset, navigate, isAdminPath }) {
