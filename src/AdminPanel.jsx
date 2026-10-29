@@ -287,7 +287,7 @@ export default function AdminPanel({ user, onLogout }) {
             <p>{group.title}</p>
             {group.items.map(item => {
               const Icon = item.icon;
-              return <button key={item.label} className={`np-admin-nav-item ${section === item.label ? "active" : ""}`} onClick={() => selectSection(item.label)}>
+              return <button key={item.label} className={`np-admin-nav-item ${section === (item.target || item.label) ? "active" : ""}`} onClick={() => selectSection(item.target || item.label)}>
                 <Icon size={18}/><span>{item.navLabel || item.label}</span>{section === item.label && <ChevronRight className="np-admin-nav-chevron" size={15}/>}
               </button>;
             })}
