@@ -231,7 +231,7 @@ function AuthScreen({ mode, setMode, name, setName, mobile, setMobile, sponsorCo
               <>
                 <label className="np-field"><span>Full name</span><input value={name} onChange={(e) => setName(e.target.value)} placeholder="Enter your full name" autoComplete="name" maxLength={120} required /></label>
                 <label className="np-field"><span>Email address</span><input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@example.com" autoComplete="email" required /></label>
-                <label className="np-field"><span>Mobile number</span><input type="tel" inputMode="tel" value={mobile} onChange={(e) => setMobile(e.target.value)} placeholder="Enter mobile number" autoComplete="tel" minLength={10} maxLength={18} pattern="\\+?[0-9 ()-]{10,18}" required /></label>
+                <label className="np-field"><span>Mobile number</span><input type="tel" inputMode="tel" value={mobile} onChange={(e) => setMobile(e.target.value)} placeholder="Enter mobile number" autoComplete="tel" minLength={10} maxLength={18} pattern="\+?[0-9 ()-]{10,18}" required /></label>
                 <label className="np-field"><span>Referral ID</span><input value={sponsorCode} onChange={(e) => setSponsorCode(e.target.value.toUpperCase())} placeholder="Enter referral ID" autoComplete="off" maxLength={80} required /></label>
               </>
             )}
