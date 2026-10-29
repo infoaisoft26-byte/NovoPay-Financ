@@ -346,8 +346,8 @@ export default function UserDashboard({ user, onLogout }) {
           {!error && section === "profile" && <section className="np-user-panel"><PanelTitle title="Profile information" subtitle="Verified details from your NovoPay account" />{profile ? <div className="np-user-profile-grid"><ProfileField label="Full name" value={profile.full_name} /><ProfileField label="NovoPay ID" value={profile.novopay_id} /><ProfileField label="Email address" value={profile.email} /><ProfileField label="Account status" value={profile.status} /><ProfileField label="Member since" value={date(profile.created_at)} /></div> : <Empty title="Profile not ready" message="Your verified profile will appear here once the account record has been created." />}</section>}
           {!error && section === "support" && <section className="np-user-panel"><PanelTitle title="Support" subtitle="Your support history" /><Records rows={rows} type="support" loading={loading} /><div className="np-user-support-note"><CircleHelp size={19} /><div><b>Need help?</b><p>You can contact our support team if you need help with your account.</p></div></div></section>}
         </div>
+        <footer className="np-user-footer"><span>© {new Date().getFullYear()} NovoPay Finance</span><span>Developed by <strong>AISOFT Studio</strong></span></footer>
       </section>
-    <footer className="np-user-footer"><span>© {new Date().getFullYear()} NovoPay Finance</span><span>Developed by <strong>AISOFT Studio</strong></span></footer>
       </main>
   );
 }
