@@ -144,3 +144,48 @@ html,body,#root{width:100%;min-width:0;max-width:100%;margin:0}
 .np-user-table td .np-user-ref{overflow-wrap:anywhere}
 @media(max-width:1180px){.np-user-overview-stats{grid-template-columns:repeat(3,minmax(0,1fr))}}
 @media(max-width:700px){.np-user-overview-stats{grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}.np-user-overview-stats .np-user-stat{padding:13px 11px;gap:8px}.np-user-overview-stats .np-user-stat-icon{width:32px;height:32px}.np-user-overview-stats .np-user-stat strong{font-size:15px}.np-user-table{min-width:780px}.np-user-table th,.np-user-table td{padding:11px 12px}}
+
+
+/* Compact card sizing and dark activation buttons requested for the member dashboard. */
+.np-basic-plan button,
+.np-user-package-summary button,
+.np-user-package>button:not(:disabled){
+  background:#172033;
+  border:1px solid #172033;
+  color:#fff;
+  border-radius:7px;
+  padding:8px 12px;
+  font-size:11px;
+  font-weight:750;
+}
+.np-basic-plan button:hover,
+.np-user-package-summary button:hover,
+.np-user-package>button:not(:disabled):hover{
+  background:#27364f;
+  border-color:#27364f;
+}
+.np-user-content{padding:22px 24px 28px}
+.np-user-panel{padding:16px 15px;border-radius:11px}
+.np-user-panel-title{margin-bottom:13px}
+.np-user-package-grid{gap:10px}
+.np-user-package{padding:14px;border-radius:10px}
+.np-user-package-icon{width:32px;height:32px;margin-bottom:11px}
+.np-user-package>strong{font-size:16px}
+.np-user-package p{margin:8px 0;min-height:26px;line-height:1.55}
+.np-user-package-summary{padding:13px;gap:9px;border-radius:10px}
+.np-user-package-summary h3{font-size:14px}
+.np-user-package-summary strong{font-size:18px}
+.np-user-cap-card{padding:16px;border-radius:11px}
+.np-user-stat{padding:13px}
+.np-user-welcome-card{padding:19px 21px;border-radius:13px}
+.np-user-grid-two{gap:13px;margin-top:13px}
+.np-user-package-overview{gap:10px;margin-bottom:12px}
+.np-user-action-form{padding:16px}
+@media(max-width:760px){
+  .np-user-content{padding:16px 12px 24px}
+  .np-user-panel{padding:13px 11px}
+  .np-user-package{padding:13px}
+  .np-user-package-summary{padding:12px}
+  .np-user-welcome-card{padding:15px}
+  .np-user-cap-card{padding:13px 11px}
+}
