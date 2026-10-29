@@ -189,3 +189,48 @@ html,body,#root{width:100%;min-width:0;max-width:100%;margin:0}
   .np-user-welcome-card{padding:15px}
   .np-user-cap-card{padding:13px 11px}
 }
+
+
+/* Smooth member-portal motion and refined profile editor. */
+@keyframes npFadeUp {
+  from { opacity: 0; transform: translateY(9px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes npSoftPop {
+  from { opacity: 0; transform: scale(.985); }
+  to { opacity: 1; transform: scale(1); }
+}
+.np-user-content > * { animation: npFadeUp .32s ease both; }
+.np-user-panel, .np-user-stat, .np-user-package, .np-user-package-summary,
+.np-user-cap-card, .np-user-welcome-card, .np-user-level-income {
+  transition: transform .2s ease, box-shadow .2s ease, border-color .2s ease;
+}
+.np-user-stat:hover, .np-user-package:hover, .np-user-package-summary:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 10px 26px rgba(26, 45, 78, .09);
+}
+.np-user-nav button { transition: background .18s ease, color .18s ease, transform .18s ease; }
+.np-user-nav button:hover { transform: translateX(2px); }
+.np-user-action-form button, .np-user-primary-link { transition: transform .18s ease, box-shadow .18s ease, opacity .18s ease; }
+.np-user-action-form button:hover:not(:disabled) { transform: translateY(-1px); box-shadow: 0 7px 18px rgba(49,95,212,.2); }
+.np-user-action-form button:disabled { opacity: .65; cursor: wait; }
+.np-user-profile-panel { animation: npSoftPop .3s ease both; }
+.np-user-profile-form { margin-top: 20px; display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 14px; }
+.np-user-profile-form > label { display: flex; flex-direction: column; gap: 7px; min-width: 0; font-size: 12px; font-weight: 750; color: #35445b; }
+.np-user-profile-form input { width: 100%; min-width: 0; box-sizing: border-box; padding: 12px 13px; border: 1px solid #dce3ee; border-radius: 9px; background: #fff; color: #26364d; font: inherit; font-weight: 500; transition: border-color .18s ease, box-shadow .18s ease; }
+.np-user-profile-form input:focus { outline: none; border-color: #315fd4; box-shadow: 0 0 0 3px rgba(49,95,212,.12); }
+.np-user-profile-form .np-user-profile-form-heading { grid-column: 1 / -1; display: flex; align-items: flex-start; gap: 10px; color: #244b9b; padding-bottom: 5px; }
+.np-user-profile-form-heading div { display: grid; gap: 4px; }
+.np-user-profile-form-heading b { color: #24344c; font-size: 14px; }
+.np-user-profile-form-heading small { color: #748198; font-size: 11px; font-weight: 500; line-height: 1.5; }
+.np-user-profile-form > button, .np-user-profile-form > p[role="status"] { grid-column: 1 / -1; }
+.np-user-profile-form > p[role="status"] { margin: 0; padding: 11px 13px; border-radius: 8px; }
+@media (max-width: 600px) {
+  .np-user-profile-form { grid-template-columns: minmax(0,1fr); gap: 12px; }
+  .np-user-profile-form > label, .np-user-profile-form > button, .np-user-profile-form > p[role="status"] { grid-column: 1; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .np-user-content > *, .np-user-profile-panel { animation: none !important; }
+  .np-user-stat, .np-user-package, .np-user-package-summary, .np-user-nav button,
+  .np-user-action-form button, .np-user-primary-link, .np-user-action-form input { transition: none !important; }
+}
