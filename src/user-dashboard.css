@@ -121,3 +121,19 @@ html,body,#root{width:100%;min-width:0;max-width:100%;margin:0}
 
 /* NovoPay logo in member/admin sidebars */
 .np-sidebar-logo{display:block;width:190px;max-width:100%;height:auto;max-height:58px;object-fit:contain;object-position:left center;margin-bottom:6px}.np-user-brand,.np-admin-brand-name{min-width:0;flex:1}.np-user-brand small,.np-admin-brand-name small{margin-top:5px}
+
+
+/* Final layout polish: keep the footer inside the content column and use one consistent light theme. */
+.np-user-main{display:flex;flex-direction:column;min-height:100vh}
+.np-user-content{flex:1 0 auto}
+.np-user-footer{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;padding:16px 30px;margin-top:auto;border-top:1px solid #e6ebf3;background:#fff;color:#8793a6;font-size:11px}
+.np-user-footer strong{color:#34445d;font-weight:800}
+.np-user-action-form{background:#fff;border-color:#e5eaf3;box-shadow:0 3px 12px #1b2e4e05}
+.np-user-action-form label{color:#35445b}
+.np-user-action-form input{background:#fff;border-color:#dce3ee;color:#26364d}
+.np-user-action-form input:focus{outline:2px solid #d9e4ff;border-color:#4169e1}
+.np-user-action-form button{background:#315fd4;color:#fff}
+.np-user-action-form p[role=status]{background:#eef4ff;color:#29477f}
+.np-user-referral-code{color:#315fd4}
+.np-user-referral-link{background:#f8faff;border-color:#e3e9f3;color:#34445d}
+@media(max-width:760px){.np-user-footer{padding:14px 15px;font-size:10px}}
