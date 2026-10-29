@@ -136,6 +136,7 @@ export default function AdminPanel({ user, onLogout }) {
   const [loadingData, setLoadingData] = useState(false);
   const [settingUpAdmin, setSettingUpAdmin] = useState(false);
   const [actionBusy, setActionBusy] = useState("");
+  const [platformSettings, setPlatformSettings] = useState({ maintenanceMode:false, enforceWithdrawalTiming:true, depositAddress:"", network:"BNB Smart Chain (BEP20)", asset:"USDT", walletLink:"", qrImageUrl:"", networkNotice:"Only USDT on BNB Smart Chain (BEP20) is accepted.", basicPackageVisible:true, fdPackageVisible:true, depositVisible:true, brochurePdfUrl:"", commissions:[5,1,1,1,1,1,1,1,1,1,1,1,0.5,0.5,0.5] });
   const [reloadKey, setReloadKey] = useState(0);
   const sections = useMemo(() => navGroups.flatMap(g => g.items), []);
   const active = sections.find(x => x.label === section) || { icon: LayoutDashboard };
@@ -195,6 +196,28 @@ export default function AdminPanel({ user, onLogout }) {
     const interval = window.setInterval(() => setReloadKey(value => value + 1), 15000);
     return () => window.clearInterval(interval);
   }, []);
+
+  async function savePlatformSettings() {
+    setActionBusy("save-settings"); setDataError(""); setNotice("");
+    try {
+      const token = await user.getIdToken();
+      const response = await fetch("/api/admin-actions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: "Bearer " + token },
+        body: JSON.stringify({ action: "save-settings", settings: platformSettings })
+      });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(payload.error || "Settings could not be saved.");
+      setPlatformSettings(current => ({ ...current, ...(payload.settings || {}) }));
+      setNotice("All NovoPay system settings saved. Commission changes apply to future settlements only.");
+      setReloadKey(value => value + 1);
+    } catch (error) { setDataError(error.message || "Settings could not be saved."); }
+    finally { setActionBusy(""); }
+  }
+
+  function updateCommission(index, value) {
+    setPlatformSettings(current => ({ ...current, commissions: current.commissions.map((rate, i) => i === index ? value : rate) }));
+  }
 
   async function runAdminAction(action, row, label) {
     const key = action + ":" + (row.reference || row.id || row.novopay_id || "");
@@ -297,7 +320,39 @@ export default function AdminPanel({ user, onLogout }) {
           {notice && <div className="np-admin-notice" role="status"><CircleHelp size={17}/><span>{notice}</span><button onClick={() => setNotice("")} aria-label="Dismiss"><X size={16}/></button></div>}
           {dataError.includes("Admin server permission is not set") && <div className="np-admin-inline-error" role="alert"><ShieldAlert size={17}/><span>Admin permission setup is required for this Firebase account.</span><button className="np-admin-refresh" disabled={settingUpAdmin} onClick={async () => { setSettingUpAdmin(true); setDataError(""); try { const token = await user.getIdToken(true); const response = await fetch("/api/setup-admin", { method: "POST", headers: { Authorization: "Bearer " + token } }); const payload = await response.json().catch(() => ({})); if (!response.ok) throw new Error(payload.error || "Admin setup could not be completed."); await user.getIdToken(true); setDataError(""); setNotice("Admin access setup complete. Loading your admin records."); setReloadKey(value => value + 1); } catch (error) { setDataError(error.message || "Admin setup could not be completed."); } finally { setSettingUpAdmin(false); } }}>{settingUpAdmin ? "Setting up…" : "Set up admin access"}</button></div>}
 
-          {section === "Overview" ? <>
+          {section === "Settings" ? <section className="np-admin-panel np-admin-settings-panel">
+            <div className="np-admin-panel-heading"><div><h3>System Settings</h3><p>Manage NovoPay system controls and USDT BEP20 deposit details. Changes are saved to the NovoPay database.</p></div><span className="np-admin-live-label"><span/> Persistent settings</span></div>
+            {dataError && <div className="np-admin-inline-error" role="alert"><ShieldAlert size={17}/><span>{dataError}</span></div>}
+            <div className="np-admin-settings-body">
+              <section className="np-admin-settings-card"><h3>Website Maintenance Mode</h3><p>When enabled, members and visitors should see a maintenance screen. Admin access remains available.</p>
+                <label className="np-admin-toggle-row"><span><b>Enable maintenance mode</b><small>{platformSettings.maintenanceMode ? "ON — maintenance enabled" : "OFF — website normal"}</small></span><input type="checkbox" checked={!!platformSettings.maintenanceMode} onChange={e=>setPlatformSettings(v=>({...v,maintenanceMode:e.target.checked}))}/></label>
+              </section>
+              <section className="np-admin-settings-card"><h3>Withdrawal Time Control</h3><p>Normal window: 10:30 AM–3:30 PM IST. OTP and admin approval remain required.</p>
+                <label className="np-admin-toggle-row"><span><b>Enforce withdrawal timing</b><small>{platformSettings.enforceWithdrawalTiming ? "TIME RESTRICTION ON — 10:30 AM to 3:30 PM IST" : "TIME RESTRICTION OFF — requests allowed any time"}</small></span><input type="checkbox" checked={platformSettings.enforceWithdrawalTiming !== false} onChange={e=>setPlatformSettings(v=>({...v,enforceWithdrawalTiming:e.target.checked}))}/></label>
+              </section>
+              <section className="np-admin-settings-card"><h3>USDT BEP20 Deposit Wallet</h3><p>Only USDT on BNB Smart Chain (BEP20) is configured for member deposits.</p>
+                <label className="np-admin-toggle-row"><span><b>Show deposit details to users</b><small>{platformSettings.depositVisible ? "VISIBLE" : "HIDDEN"}</small></span><input type="checkbox" checked={!!platformSettings.depositVisible} onChange={e=>setPlatformSettings(v=>({...v,depositVisible:e.target.checked}))}/></label>
+                <div className="np-admin-settings-grid">
+                  <label>USDT BEP20 Deposit Address<input value={platformSettings.depositAddress || ""} placeholder="0x…" onChange={e=>setPlatformSettings(v=>({...v,depositAddress:e.target.value.trim()}))}/></label>
+                  <label>Network<input value="BNB Smart Chain (BEP20)" readOnly /></label>
+                  <label>Asset<input value="USDT" readOnly /></label>
+                  <label>Wallet / Open Link<input value={platformSettings.walletLink || ""} placeholder="https://…" onChange={e=>setPlatformSettings(v=>({...v,walletLink:e.target.value}))}/></label>
+                  <label>QR Image URL<input value={platformSettings.qrImageUrl || ""} placeholder="https://…" onChange={e=>setPlatformSettings(v=>({...v,qrImageUrl:e.target.value}))}/></label>
+                  <label className="wide">Network Notice / Warning<textarea value={platformSettings.networkNotice || ""} onChange={e=>setPlatformSettings(v=>({...v,networkNotice:e.target.value}))}/></label>
+                </div>
+                {platformSettings.qrImageUrl && <div className="np-admin-qr-preview"><img src={platformSettings.qrImageUrl} alt="USDT BEP20 deposit QR preview" onError={e=>{e.currentTarget.style.display="none"}}/><span>USDT BEP20 deposit QR preview</span></div>}
+              </section>
+              <section className="np-admin-settings-card"><h3>Package Visibility</h3>
+                <label className="np-admin-toggle-row"><span><b>Basic Package</b><small>{platformSettings.basicPackageVisible ? "LIVE / Visible to users" : "HIDDEN"}</small></span><input type="checkbox" checked={!!platformSettings.basicPackageVisible} onChange={e=>setPlatformSettings(v=>({...v,basicPackageVisible:e.target.checked}))}/></label>
+                <label className="np-admin-toggle-row"><span><b>FD Package</b><small>{platformSettings.fdPackageVisible ? "LIVE / Visible to users" : "HIDDEN"}</small></span><input type="checkbox" checked={!!platformSettings.fdPackageVisible} onChange={e=>setPlatformSettings(v=>({...v,fdPackageVisible:e.target.checked}))}/></label>
+              </section>
+              <section className="np-admin-settings-card"><h3>Brochure PDF</h3><p>Set the public URL of the current NovoPay brochure PDF.</p><label>Brochure PDF URL<input value={platformSettings.brochurePdfUrl || ""} placeholder="https://…" onChange={e=>setPlatformSettings(v=>({...v,brochurePdfUrl:e.target.value}))}/></label></section>
+              <section className="np-admin-settings-card"><h3>Level Commission Settings (L1–L15)</h3><p>Percent of eligible joining/re-topup amount or daily ROI, according to the configured income rules. Changes apply to future settlements only; past credits and wallet balances are not changed.</p>
+                <div className="np-admin-commission-grid">{platformSettings.commissions.map((rate,index)=><label key={index}>Level {index+1} (%)<input type="number" min="0" max="100" step="0.1" value={rate} onChange={e=>updateCommission(index,e.target.value === "" ? "" : Number(e.target.value))}/></label>)}</div>
+              </section>
+              <div className="np-admin-settings-savebar"><span>Save changes to the NovoPay settings database.</span><button className="np-admin-action-button success" disabled={actionBusy==="save-settings"} onClick={savePlatformSettings}>{actionBusy==="save-settings" ? "Saving…" : "Save All Settings"}</button></div>
+            </div>
+          </section> : section === "Overview" ? <>
             <div className="np-admin-welcome">
               <div><span className="np-admin-welcome-icon"><ShieldCheck size={23}/></span><div><h2>Welcome to NovoPay Admin</h2><p>Manage NovoPay users, deposits, withdrawals, packages, reports and support from one control panel. Records refresh automatically.</p></div></div>
               <span className="np-admin-ready-pill"><span/> Login active</span>
