@@ -386,25 +386,58 @@ function Empty({ title, message }) {
 function Records({ rows, type, loading }) {
   if (loading) return <Loading />;
   if (!rows?.length) return <Empty title="No records yet" message="There are no verified records to display for this section." />;
+
   const incomeSections = ["income-all", "basic-roi", "basic-referral", "basic-level", "fd-roi", "fd-referral", "fd-level", "salary"];
-  const columns = ["direct-team", "team-list"].includes(type)
-    ? [["novopay_id", "NovoPay ID"], ["full_name", "Member"], ["email", "Email"], ["status", "Status"], ["level", "Level"], ["created_at", "Joined"]]
-    : type === "reports"
-    ? [["name", "Report"], ["value", "Value"]]
-    : type === "referrals"
-    ? [["created_at", "Date & Time"], ["referred_user_id", "Source Member ID"], ["reference", "Income Ref"], ["basis_amount", "Package Amount"], ["rate", "Rate"], ["amount", "Income (USDT)"], ["status", "Status"]]
-    : type === "activations"
-    ? [["activated_at", "Date & Time"], ["reference", "Activation Ref"], ["package_name", "Package"], ["amount", "Amount (USDT)"], ["status", "Status"]]
-    : type === "deposits"
-    ? [["created_at", "Date & Time"], ["reference", "Deposit Ref"], ["tx_hash", "BSC TX Hash"], ["amount", "Amount (USDT)"], ["status", "Status"]]
-    : type === "withdrawals"
-      ? [["created_at", "Date & Time"], ["reference", "Withdrawal Ref"], ["amount", "Requested (USDT)"], ["fee", "Fee"], ["net_amount", "Net (USDT)"], ["status", "Status"]]
-      : type === "support"
-        ? [["created_at", "Date & Time"], ["reference", "Ticket"], ["subject", "Subject"], ["status", "Status"]]
-        : type === "p2p"
-          ? [["created_at", "Date & Time"], ["reference", "Transfer Ref"], ["sender_user_id", "Sender ID"], ["receiver_user_id", "Recipient ID"], ["amount", "Amount (USDT)"], ["status", "Status"]]
-          : incomeSections.includes(type)
-            ? [["created_at", "Date & Time"], ["source_member_id", "Source Member ID"], ["type", "Income Type"], ["description", "Income Description"], ["amount", "Amount (USDT)"], ["status", "Status"]]
-            : [["created_at", "Date & Time"], ["reference", "Ledger Ref"], ["type", "Transaction Type"], ["description", "Description"], ["amount", "Amount (USDT)"], ["status", "Status"]];
-  return <div className="np-user-table-wrap"><table className="np-user-table"><thead><tr>{columns.map(([key, label]) => <th key={key}>{label}</th>)}</tr></thead><tbody>{rows.map((row, i) => <tr key={row.id || row.reference || i}>{columns.map(([key]) => <td key={key}>{(["amount", "net_amount", "fee", "basis_amount"].includes(key) || (key === "value" && /USDT/i.test(String(row.name || ""))) ? money(row[key]) : key === "rate" ? (row[key] == null ? "—" : `${(Number(row[key]) * (Number(row[key]) <= 1 ? 100 : 1)).toFixed(2)}%`) : (key === "created_at" || key === "activated_at") ? date(row[key]) : key === "status" ? <span className={`np-user-status ${statusClass(row[key])}`}>{row[key] || "unknown"}</span> : <span className={["reference", "source_member_id", "novopay_id"].includes(key) ? "np-user-ref" : ""}>{row[key] ?? "—"}</span>}</td>)}</tr>)}</tbody></table></div>;
+  let columns;
+
+  if (["direct-team", "team-list"].includes(type)) {
+    columns = [["novopay_id", "NovoPay ID"], ["full_name", "Member"], ["email", "Email"], ["status", "Status"], ["level", "Level"], ["created_at", "Joined"]];
+  } else if (type === "reports") {
+    columns = [["name", "Report"], ["value", "Value"]];
+  } else if (type === "referrals") {
+    columns = [["created_at", "Date & Time"], ["referred_user_id", "Source Member ID"], ["reference", "Income Ref"], ["basis_amount", "Package Amount"], ["rate", "Rate"], ["amount", "Income (USDT)"], ["status", "Status"]];
+  } else if (type === "activations") {
+    columns = [["activated_at", "Date & Time"], ["reference", "Activation Ref"], ["package_name", "Package"], ["amount", "Amount (USDT)"], ["status", "Status"]];
+  } else if (type === "deposits") {
+    columns = [["created_at", "Date & Time"], ["reference", "Deposit Ref"], ["tx_hash", "BSC TX Hash"], ["amount", "Amount (USDT)"], ["status", "Status"]];
+  } else if (type === "withdrawals") {
+    columns = [["created_at", "Date & Time"], ["reference", "Withdrawal Ref"], ["amount", "Requested (USDT)"], ["fee", "Fee"], ["net_amount", "Net (USDT)"], ["status", "Status"]];
+  } else if (type === "support") {
+    columns = [["created_at", "Date & Time"], ["reference", "Ticket"], ["subject", "Subject"], ["status", "Status"]];
+  } else if (type === "p2p") {
+    columns = [["created_at", "Date & Time"], ["reference", "Transfer Ref"], ["sender_user_id", "Sender ID"], ["receiver_user_id", "Recipient ID"], ["amount", "Amount (USDT)"], ["status", "Status"]];
+  } else if (incomeSections.includes(type)) {
+    columns = [["created_at", "Date & Time"], ["source_member_id", "Source Member ID"], ["type", "Income Type"], ["description", "Income Description"], ["amount", "Amount (USDT)"], ["status", "Status"]];
+  } else {
+    columns = [["created_at", "Date & Time"], ["reference", "Ledger Ref"], ["type", "Transaction Type"], ["description", "Description"], ["amount", "Amount (USDT)"], ["status", "Status"]];
+  }
+
+  function renderCell(row, key) {
+    if (["amount", "net_amount", "fee", "basis_amount"].includes(key) || (key === "value" && /USDT/i.test(String(row.name || "")))) {
+      return money(row[key]);
+    }
+    if (key === "rate") {
+      return row[key] == null ? "—" : `${(Number(row[key]) * (Number(row[key]) <= 1 ? 100 : 1)).toFixed(2)}%`;
+    }
+    if (key === "created_at" || key === "activated_at") return date(row[key]);
+    if (key === "status") return <span className={`np-user-status ${statusClass(row[key])}`}>{row[key] || "unknown"}</span>;
+    return <span className={["reference", "source_member_id", "novopay_id"].includes(key) ? "np-user-ref" : ""}>{row[key] ?? "—"}</span>;
+  }
+
+  return (
+    <div className="np-user-table-wrap">
+      <table className="np-user-table">
+        <thead>
+          <tr>{columns.map(([key, label]) => <th key={key}>{label}</th>)}</tr>
+        </thead>
+        <tbody>
+          {rows.map((row, i) => (
+            <tr key={row.id || row.reference || i}>
+              {columns.map(([key]) => <td key={key}>{renderCell(row, key)}</td>)}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
 }
