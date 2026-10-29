@@ -192,28 +192,21 @@ export default async function handler(req, res) {
       await db`CREATE SEQUENCE IF NOT EXISTS novopay_referral_seq START WITH 503 INCREMENT BY 1`;
       const referralRows = await db`SELECT 'NP' || lpad(nextval('novopay_referral_seq')::text, 6, '0') AS referral_code`;
       const generatedReferral = referralRows[0].referral_code;
-      const rows = await db`INSERT INTO users (auth_uid, novopay_id, referral_code, sponsor_user_id, full_name, email, mobile)
-        VALUES (${decoded.uid}, ${generatedId}, ${generatedReferral}, ${sponsorRows[0].novopay_id}, ${displayName}, ${email}, ${mobile})
-        ON CONFLICT (auth_uid) DO UPDATE SET
-          full_name = CASE WHEN users.full_name = '' THEN EXCLUDED.full_name ELSE users.full_name END,
-          email = EXCLUDED.email,
-          mobile = COALESCE(NULLIF(users.mobile, ''), EXCLUDED.mobile),
-          referral_code = COALESCE(NULLIF(users.referral_code, ''), EXCLUDED.referral_code),
-          updated_at = now()
-        RETURNING id, auth_uid, novopay_id, full_name, email, mobile, status, fund_balance, income_balance, referral_code, sponsor_user_id, created_at`;
-      const newUser = rows[0];
-      // Pay the direct sponsor exactly once for each newly created member. The unique
-      // registration reference and idempotency key prevent duplicate credits on retries.
-      await db`WITH commission AS (
+      const rows = await db`WITH new_user AS (
+          INSERT INTO users (auth_uid, novopay_id, referral_code, sponsor_user_id, full_name, email, mobile)
+          VALUES (${decoded.uid}, ${generatedId}, ${generatedReferral}, ${sponsorRows[0].novopay_id}, ${displayName}, ${email}, ${mobile})
+          ON CONFLICT (auth_uid) DO NOTHING
+          RETURNING id, auth_uid, novopay_id, full_name, email, mobile, status, fund_balance, income_balance, referral_code, sponsor_user_id, created_at
+        ), commission AS (
           INSERT INTO referral_commissions
             (reference, sponsor_user_id, referred_user_id, package_activation_ref, basis_amount, rate, amount, currency, status, level)
-          VALUES (
-            ${"REGREF-" + newUser.novopay_id},
+          SELECT
+            'REGREF-' || new_user.novopay_id,
             ${sponsorRows[0].novopay_id},
-            ${newUser.novopay_id},
-            ${"REG-" + newUser.novopay_id},
+            new_user.novopay_id,
+            'REG-' || new_user.novopay_id,
             0, 0, 0.50, 'USDT', 'posted', 1
-          )
+          FROM new_user
           ON CONFLICT (package_activation_ref, level) DO NOTHING
           RETURNING sponsor_user_id, referred_user_id, amount, reference
         ), wallet_credit AS (
@@ -239,9 +232,13 @@ export default async function handler(req, res) {
           ON CONFLICT (idempotency_key) DO NOTHING
           RETURNING id
         )
-        SELECT (SELECT count(*) FROM wallet_credit) AS wallets_credited,
-               (SELECT count(*) FROM ledger_credit) AS ledger_entries`;
-      return res.status(200).json({ ok: true, user: newUser });
+        SELECT new_user.* FROM new_user`;
+      if (!rows[0]) {
+        const racedProfile = await db`SELECT id, auth_uid, novopay_id, full_name, email, mobile, status, fund_balance, income_balance, referral_code, sponsor_user_id, created_at FROM users WHERE auth_uid = ${decoded.uid} LIMIT 1`;
+        if (racedProfile[0]) return res.status(200).json({ ok: true, user: racedProfile[0] });
+        throw new Error("Registration profile could not be created. Please try again.");
+      }
+      return res.status(200).json({ ok: true, user: rows[0] });
     }
 
     if (req.method !== "GET") {
