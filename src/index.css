@@ -117,3 +117,14 @@
 .np-admin-record-row span:nth-child(2){font-weight:700;text-transform:capitalize}
 .np-admin-record-row span:nth-child(3){color:#64738a}
 @media(max-width:700px){.np-admin-record-row{padding:13px 16px;gap:12px;min-width:660px}.np-admin-inline-error{margin:12px 14px 0;font-size:12px}}
+
+
+/* NovoPay admin review actions */
+.np-admin-record-row.has-actions{grid-template-columns:minmax(180px,1.05fr) minmax(105px,.55fr) minmax(200px,1.2fr) minmax(170px,.9fr);min-width:900px}
+.np-admin-row-actions{display:flex;flex-wrap:wrap;gap:7px;align-items:center}
+.np-admin-action-button{border:1px solid transparent;border-radius:8px;padding:8px 10px;font-size:10px;font-weight:800;white-space:nowrap;cursor:pointer;transition:transform .15s ease,opacity .15s ease}
+.np-admin-action-button:hover{transform:translateY(-1px)}
+.np-admin-action-button:disabled{opacity:.55;cursor:wait;transform:none}
+.np-admin-action-button.success{background:#e8f8ef;border-color:#bde9cd;color:#167348}
+.np-admin-action-button.danger{background:#fff0f0;border-color:#f5caca;color:#b4232f}
+.np-admin-action-button:not(.success):not(.danger){background:#edf3ff;border-color:#d2dfff;color:#315bd5}
