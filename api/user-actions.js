@@ -184,6 +184,12 @@ export default async function handler(req, res) {
       const txHash = String(req.body?.tx_hash || "").trim();
       if (!/^(0x)?[a-fA-F0-9]{64}$/.test(txHash)) fail("Enter a valid BSC transaction hash.");
       const normalizedHash = txHash.startsWith("0x") ? txHash.toLowerCase() : "0x" + txHash.toLowerCase();
+      const existingDeposit = await sql`SELECT reference, user_id, amount, currency, status, tx_hash, created_at
+        FROM deposits WHERE lower(tx_hash) = ${normalizedHash} LIMIT 1`;
+      if (existingDeposit[0]) {
+        if (existingDeposit[0].user_id !== profile.novopay_id) fail("This transaction hash has already been submitted.", 409);
+        return res.status(200).json({ ok: true, message: "Existing deposit request found. Checking blockchain confirmation.", record: existingDeposit[0] });
+      }
       const rows = await sql`WITH created AS (
         INSERT INTO deposits (reference, user_id, amount, currency, status, tx_hash)
         VALUES (${reference}, ${profile.novopay_id}, ${amount}, 'USDT', 'pending', ${normalizedHash})
