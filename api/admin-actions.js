@@ -1,0 +1,127 @@
+import { cert, getApps, initializeApp } from "firebase-admin/app";
+import { getAuth } from "firebase-admin/auth";
+import { neon } from "@neondatabase/serverless";
+
+function services() {
+  const raw = process.env.FIREBASE_SERVICE_ACCOUNT_JSON;
+  const url = String(process.env.DATABASE_URL || "").trim();
+  if (!raw || !url) throw Object.assign(new Error("NovoPay backend is not configured."), { status: 503 });
+  let account;
+  try { account = JSON.parse(raw); }
+  catch { try { account = JSON.parse(Buffer.from(raw, "base64").toString("utf8")); } catch { throw Object.assign(new Error("NovoPay Firebase server credentials are invalid."), { status: 503 }); } }
+  if (typeof account === "string") account = JSON.parse(account);
+  if (account?.project_id !== "novopay-finance" || !account.client_email || !account.private_key) throw Object.assign(new Error("NovoPay Firebase service account is invalid."), { status: 503 });
+  account.private_key = String(account.private_key).replace(/\\n/g, "\n");
+  const name = "novopay-admin-actions";
+  const app = getApps().find(x => x.name === name) || initializeApp({ credential: cert(account), projectId: "novopay-finance" }, name);
+  return { auth: getAuth(app), db: neon(url) };
+}
+
+export default async function handler(req, res) {
+  res.setHeader("Cache-Control", "no-store");
+  res.setHeader("Vary", "Authorization");
+  if (req.method !== "POST") { res.setHeader("Allow", "POST"); return res.status(405).json({ error: "Method not allowed." }); }
+  try {
+    const { auth, db } = services();
+    const header = req.headers.authorization || "";
+    const token = header.startsWith("Bearer ") ? header.slice(7) : "";
+    if (!token) return res.status(401).json({ error: "Sign-in required." });
+    let actor;
+    try { actor = await auth.verifyIdToken(token, true); } catch { return res.status(401).json({ error: "Session is invalid or expired." }); }
+    if (actor.admin !== true) return res.status(403).json({ error: "Administrator permission is required." });
+
+    const body = typeof req.body === "string" ? JSON.parse(req.body || "{}") : (req.body || {});
+    const action = String(body.action || "");
+    const reference = String(body.reference || "").trim().slice(0, 120);
+    const id = String(body.id || "").trim().slice(0, 120);
+    const status = String(body.status || "").trim().toLowerCase();
+    let result;
+
+    if (action === "deposit-approve" && reference) {
+      result = await db`WITH changed AS (
+        UPDATE deposits d SET status='approved', reviewed_at=now(), reviewer_uid=${actor.uid}
+        FROM users u WHERE d.user_id=u.novopay_id AND d.reference=${reference} AND d.status='pending'
+        RETURNING d.reference,d.user_id,d.amount,d.currency
+      ), credited AS (
+        UPDATE users u SET fund_balance=u.fund_balance+c.amount, updated_at=now()
+        FROM changed c WHERE u.novopay_id=c.user_id RETURNING c.reference,c.user_id,c.amount,c.currency
+      ), ledger AS (
+        INSERT INTO ledger_transactions(reference,user_id,type,amount,currency,status,description,idempotency_key)
+        SELECT 'NP-DEP-'||reference,user_id,'deposit_credit',amount,currency,'posted','Admin approved deposit '||reference,'deposit-credit:'||reference FROM credited
+        ON CONFLICT DO NOTHING RETURNING id
+      ), audit AS (
+        INSERT INTO audit_logs(actor_uid,action,entity_type,entity_id,details)
+        SELECT ${actor.uid},'deposit_approved','deposit',reference,jsonb_build_object('user_id',user_id,'amount',amount,'currency',currency) FROM credited RETURNING id
+      ) SELECT reference,user_id,amount FROM credited`;
+    } else if (action === "deposit-reject" && reference) {
+      result = await db`WITH changed AS (
+        UPDATE deposits SET status='rejected', reviewed_at=now(), reviewer_uid=${actor.uid}
+        WHERE reference=${reference} AND status='pending' RETURNING reference,user_id,amount
+      ), audit AS (
+        INSERT INTO audit_logs(actor_uid,action,entity_type,entity_id,details)
+        SELECT ${actor.uid},'deposit_rejected','deposit',reference,jsonb_build_object('user_id',user_id,'amount',amount) FROM changed RETURNING id
+      ) SELECT reference,user_id,amount FROM changed`;
+    } else if (action === "withdrawal-approve" && reference) {
+      result = await db`WITH changed AS (
+        UPDATE withdrawals SET status='approved', reviewed_at=now(), reviewer_uid=${actor.uid}
+        WHERE reference=${reference} AND status='pending' RETURNING reference,user_id,amount,net_amount
+      ), audit AS (
+        INSERT INTO audit_logs(actor_uid,action,entity_type,entity_id,details)
+        SELECT ${actor.uid},'withdrawal_approved','withdrawal',reference,jsonb_build_object('user_id',user_id,'amount',amount,'net_amount',net_amount) FROM changed RETURNING id
+      ) SELECT reference,user_id,amount,net_amount FROM changed`;
+    } else if (action === "withdrawal-reject" && reference) {
+      result = await db`WITH changed AS (
+        UPDATE withdrawals w SET status='rejected', reviewed_at=now(), reviewer_uid=${actor.uid}
+        FROM users u WHERE w.user_id=u.novopay_id AND w.reference=${reference} AND w.status='pending'
+        RETURNING w.reference,w.user_id,w.amount,w.currency
+      ), refunded AS (
+        UPDATE users u SET fund_balance=u.fund_balance+c.amount, updated_at=now()
+        FROM changed c WHERE u.novopay_id=c.user_id RETURNING c.reference,c.user_id,c.amount,c.currency
+      ), ledger AS (
+        INSERT INTO ledger_transactions(reference,user_id,type,amount,currency,status,description,idempotency_key)
+        SELECT 'NP-WDR-REFUND-'||reference,user_id,'withdrawal_refund',amount,currency,'posted','Refund for rejected withdrawal '||reference,'withdrawal-refund:'||reference FROM refunded
+        ON CONFLICT DO NOTHING RETURNING id
+      ), audit AS (
+        INSERT INTO audit_logs(actor_uid,action,entity_type,entity_id,details)
+        SELECT ${actor.uid},'withdrawal_rejected_refunded','withdrawal',reference,jsonb_build_object('user_id',user_id,'amount',amount) FROM refunded RETURNING id
+      ) SELECT reference,user_id,amount FROM refunded`;
+    } else if (action === "user-status" && id && ["active","suspended"].includes(status)) {
+      result = await db`WITH changed AS (
+        UPDATE users SET status=${status}, updated_at=now() WHERE novopay_id=${id} RETURNING novopay_id,status
+      ), audit AS (
+        INSERT INTO audit_logs(actor_uid,action,entity_type,entity_id,details)
+        SELECT ${actor.uid},'user_status_changed','user',novopay_id,jsonb_build_object('status',status) FROM changed RETURNING id
+      ) SELECT novopay_id,status FROM changed`;
+    } else if (action === "kyc-status" && id && ["approved","rejected"].includes(status)) {
+      result = await db`WITH changed AS (
+        UPDATE kyc_submissions SET status=${status}, reviewed_at=now(), reviewer_uid=${actor.uid}
+        WHERE id::text=${id} AND status='pending' RETURNING id,user_id,status
+      ), audit AS (
+        INSERT INTO audit_logs(actor_uid,action,entity_type,entity_id,details)
+        SELECT ${actor.uid},'kyc_'||status,'kyc',id::text,jsonb_build_object('user_id',user_id) FROM changed RETURNING id
+      ) SELECT id,user_id,status FROM changed`;
+    } else if (action === "support-status" && id && ["open","pending","resolved","closed"].includes(status)) {
+      result = await db`WITH changed AS (
+        UPDATE support_tickets SET status=${status}, updated_at=now() WHERE id::text=${id} RETURNING id,reference,status
+      ), audit AS (
+        INSERT INTO audit_logs(actor_uid,action,entity_type,entity_id,details)
+        SELECT ${actor.uid},'support_status_changed','support_ticket',reference,jsonb_build_object('status',status) FROM changed RETURNING id
+      ) SELECT id,reference,status FROM changed`;
+    } else if (action === "package-status" && id && ["active","paused","archived","draft"].includes(status)) {
+      result = await db`WITH changed AS (
+        UPDATE packages SET status=${status}, updated_at=now() WHERE id::text=${id} RETURNING id,name,status
+      ), audit AS (
+        INSERT INTO audit_logs(actor_uid,action,entity_type,entity_id,details)
+        SELECT ${actor.uid},'package_status_changed','package',id::text,jsonb_build_object('name',name,'status',status) FROM changed RETURNING id
+      ) SELECT id,name,status FROM changed`;
+    } else {
+      return res.status(400).json({ error: "Unsupported action or missing record details." });
+    }
+
+    if (!result?.length) return res.status(409).json({ error: "No pending matching record was changed. It may already be reviewed or may not exist." });
+    return res.status(200).json({ ok: true, record: result[0] });
+  } catch (error) {
+    console.error("[NovoPay API] /api/admin-actions failed", { name: error?.name, code: error?.code, status: error?.status });
+    return res.status(error?.status || 500).json({ error: error?.status === 503 ? error.message : "Admin action could not be completed safely." });
+  }
+}
