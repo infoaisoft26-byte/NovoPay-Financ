@@ -159,3 +159,5 @@
 .np-auth-footer strong{font-weight:800;color:#34435a;letter-spacing:.1px}
 .np-auth-footer span:last-child{display:flex;align-items:center;gap:4px}
 @media(max-width:480px){.np-auth-footer{justify-content:center;text-align:center}.np-auth-footer span{width:100%;justify-content:center}}
+
+.np-user-footer{max-width:1480px;margin:24px auto 0;padding:18px 4px 4px;border-top:1px solid #e5eaf2;display:flex;justify-content:space-between;align-items:center;gap:12px;color:#8995a7;font-size:11px}.np-user-footer strong{color:#34435a;font-weight:800}@media(max-width:600px){.np-user-footer{flex-direction:column;align-items:center;text-align:center}}
