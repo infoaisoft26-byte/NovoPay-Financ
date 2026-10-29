@@ -81,7 +81,7 @@ async function authenticatedUser(req, auth) {
 }
 
 async function getProfile(db, uid) {
-  const rows = await db`SELECT id, auth_uid, novopay_id, full_name, email, status, fund_balance, income_balance, referral_code, sponsor_user_id, created_at FROM users WHERE auth_uid = ${uid} LIMIT 1`;
+  const rows = await db`SELECT id, auth_uid, novopay_id, full_name, email, mobile, status, fund_balance, income_balance, referral_code, sponsor_user_id, created_at FROM users WHERE auth_uid = ${uid} LIMIT 1`;
   return rows[0] || null;
 }
 
@@ -256,7 +256,8 @@ export default async function handler(req, res) {
     return res.status(200).json({ ok: true, section, user: profile, rows, depositAddress, brochureUrl, maintenanceMode, platformSettings });
   } catch (error) {
     const status = error?.status || 500;
-    if (status === 503 || status === 401) return res.status(status).json({ error: error.message });
+    if (status === 503) return res.status(status).json({ error: "Your account service is temporarily unavailable. Please try again later." });
+    if (status === 401) return res.status(status).json({ error: "Your session has expired. Please sign in again." });
     // Log a safe diagnostic on the server; never expose database or credential details to the browser.
     console.error("[NovoPay API] /api/user failed", { name: error?.name, message: error?.message, code: error?.code, status, section: req.query?.section || "overview" });
     return res.status(status === 403 ? 403 : 500).json({ error: status === 403 ? error.message : "NovoPay account data could not be loaded." });
