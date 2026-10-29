@@ -178,7 +178,21 @@ export default function UserDashboard({ user, onLogout }) {
       const response = await fetch("/api/user-actions", { method: "POST", headers: { Authorization: "Bearer " + token, "Content-Type": "application/json" }, body: JSON.stringify({ action, ...payload }) });
       const result = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(result.error || "Request could not be completed.");
-      setActionMessage(result.message || "Request submitted."); setTxHash(""); setWithdrawAmount("");
+      let finalResult = result;
+      if (action === "deposit-request") {
+        const verifyResponse = await fetch("/api/deposit-verify", {
+          method: "POST",
+          headers: { Authorization: "Bearer " + token, "Content-Type": "application/json" },
+          body: JSON.stringify({ tx_hash: payload.tx_hash }),
+          cache: "no-store",
+        });
+        const verifyResult = await verifyResponse.json().catch(() => ({}));
+        if (verifyResponse.ok) finalResult = verifyResult;
+        else finalResult = { ...result, message: verifyResult.error || "Deposit submitted and awaiting blockchain verification." };
+      }
+      setActionMessage(finalResult.message || "Request submitted.");
+      if (action !== "deposit-request" || String(finalResult.status || "").toLowerCase() === "approved") setTxHash("");
+      setWithdrawAmount("");
       await load();
     } catch (err) { setActionMessage(err.message || "Request could not be completed."); }
     finally { setActionBusy(false); }
