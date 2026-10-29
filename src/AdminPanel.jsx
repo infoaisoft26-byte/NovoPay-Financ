@@ -328,8 +328,7 @@ export default function AdminPanel({ user, onLogout }) {
       {mobileOpen && <button className="np-admin-scrim" aria-label="Close navigation" onClick={() => setMobileOpen(false)} />}
       <aside className={`np-admin-sidebar ${mobileOpen ? "is-open" : ""}`}>
         <div className="np-admin-brand-row">
-          <span className="np-admin-brand-icon"><WalletCards size={22} /></span>
-          <span className="np-admin-brand-name">NovoPay <b>Finance</b><small>ADMIN CONTROL DESK</small></span>
+          <span className="np-admin-brand-name"><img className="np-sidebar-logo" src="/novopay-logo.svg" alt="NovoPay Finance" /><small>ADMIN CONTROL DESK</small></span>
           <button className="np-admin-mobile-close" aria-label="Close menu" onClick={() => setMobileOpen(false)}><X size={19}/></button>
         </div>
         <div className="np-admin-workspace"><span className="np-admin-workspace-dot"/><span><b>Administration</b><small>Independent NovoPay workspace</small></span></div>
