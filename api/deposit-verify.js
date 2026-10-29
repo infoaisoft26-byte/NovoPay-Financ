@@ -87,39 +87,25 @@ export default async function handler(req, res) {
     });
     if (!transfer) fail("Transaction token, receiving address, or amount does not match this deposit request.", 409);
 
-    const credited = await sql`WITH changed AS (
-      UPDATE deposits SET status='approved', reviewed_at=now()
-      WHERE reference=${deposit.reference} AND user_id=${profile.novopay_id} AND status='pending'
-        AND lower(tx_hash)=${txHash}
-        AND NOT EXISTS (SELECT 1 FROM ledger_transactions WHERE reference = 'NP-DEP-'||deposits.reference OR idempotency_key = 'deposit-credit:'||deposits.reference)
-      RETURNING reference,user_id,amount,currency,tx_hash
-    ), balance AS (
-      UPDATE users u SET fund_balance=u.fund_balance+c.amount, updated_at=now()
-      FROM changed c WHERE u.novopay_id=c.user_id
-      RETURNING c.reference,c.user_id,c.amount,c.currency,c.tx_hash
-    ), ledger AS (
-      INSERT INTO ledger_transactions(reference,user_id,type,amount,currency,status,description,idempotency_key)
-      SELECT 'NP-DEP-'||reference,user_id,'deposit_credit',amount,currency,'posted',
-             'Automatically verified BNB Smart Chain USDT deposit ('||tx_hash||')',
-             'deposit-credit:'||reference
-      FROM balance
-      ON CONFLICT DO NOTHING
-      RETURNING id
-    ), audit AS (
+    await sql`
       INSERT INTO audit_logs(actor_uid,action,entity_type,entity_id,details)
-      SELECT ${decoded.uid},'deposit_auto_credited','deposit',reference,
-             jsonb_build_object('user_id',user_id,'amount',amount,'currency',currency,'tx_hash',tx_hash,'confirmations',${confirmations})
-      FROM balance RETURNING id
-    )
-    SELECT balance.reference,balance.amount,balance.currency,balance.tx_hash FROM balance
-    CROSS JOIN (SELECT count(*) FROM ledger) ledger_guard
-    CROSS JOIN (SELECT count(*) FROM audit) audit_guard`;
-    if (!credited.length) {
-      const current = await sql`SELECT status FROM deposits WHERE reference=${deposit.reference} LIMIT 1`;
-      if (["approved","completed","credited"].includes(String(current[0]?.status || "").toLowerCase())) return res.status(200).json({ ok: true, status: "approved", message: "This deposit has already been credited.", reference: deposit.reference });
-      fail("Deposit could not be credited safely. Please retry or contact support.", 409);
-    }
-    return res.status(200).json({ ok: true, status: "approved", message: "USDT deposit verified and credited to your Fund Wallet.", record: credited[0], confirmations });
+      SELECT ${decoded.uid}, 'deposit_blockchain_verified', 'deposit', ${deposit.reference},
+        jsonb_build_object('user_id',${profile.novopay_id},'amount',${deposit.amount}::numeric,
+          'currency','USDT','tx_hash',${txHash},'confirmations',${confirmations})
+      WHERE NOT EXISTS (
+        SELECT 1 FROM audit_logs
+        WHERE action='deposit_blockchain_verified' AND entity_id=${deposit.reference}
+          AND lower(details->>'tx_hash')=${txHash}
+      )
+    `;
+    return res.status(200).json({
+      ok: true,
+      status: "pending",
+      blockchainVerified: true,
+      message: "Transaction verified successfully. Your deposit is now waiting for admin approval.",
+      reference: deposit.reference,
+      confirmations
+    });
   } catch (error) {
     console.error("[NovoPay deposit verification]", { name: error?.name, code: error?.code, status: error?.status });
     return res.status(error?.status || 500).json({ ok: false, error: error?.status ? error.message : "Deposit verification could not be completed safely." });
