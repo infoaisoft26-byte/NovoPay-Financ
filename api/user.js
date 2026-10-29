@@ -141,7 +141,7 @@ export default async function handler(req, res) {
       else if (normalizedMobile.length === 11 && normalizedMobile.startsWith("0")) normalizedMobile = normalizedMobile.slice(1);
       const mobile = normalizedMobile;
       if (!displayName) return res.status(400).json({ error: "Please enter your full name." });
-      if (normalizedMobile.length < 10 || normalizedMobile.length > 15) return res.status(400).json({ error: "Mobile number sahi enter karein: 10 digits, ya +91 ke saath 12 digits." });
+      // Mobile is optional; accept a blank value or any user-entered number.
       if (!sponsorCode) return res.status(400).json({ error: "Referral ID is required to register." });
       await db`ALTER TABLE users ADD COLUMN IF NOT EXISTS mobile text`;
       await db`ALTER TABLE users ADD COLUMN IF NOT EXISTS referral_code text`;
@@ -150,7 +150,7 @@ export default async function handler(req, res) {
       // browser lost the profile response. Never treat the same auth user as a duplicate.
       const existingProfile = await db`SELECT id, auth_uid, novopay_id, full_name, email, mobile, status, fund_balance, income_balance, referral_code, sponsor_user_id, created_at FROM users WHERE auth_uid = ${decoded.uid} LIMIT 1`;
       if (existingProfile[0]) {
-        if (!existingProfile[0].mobile) {
+        if (!existingProfile[0].mobile && normalizedMobile) {
           const duplicateMobile = await db`SELECT novopay_id FROM users
             WHERE auth_uid <> ${decoded.uid}
               AND CASE
@@ -174,7 +174,7 @@ export default async function handler(req, res) {
       // Canonicalize existing formats when checking duplicates (10 digits, 0-prefix,
       // and +91-prefix all refer to the same Indian mobile number). Keep this check
       // in the request path read-only; index creation here can fail for legacy data.
-      const duplicateMobile = await db`SELECT novopay_id FROM users
+      const duplicateMobile = normalizedMobile ? await db`SELECT novopay_id FROM users
         WHERE CASE
           WHEN length(regexp_replace(COALESCE(mobile, ''), '[^0-9]', '', 'g')) = 12
             AND left(regexp_replace(COALESCE(mobile, ''), '[^0-9]', '', 'g'), 2) = '91'
@@ -184,7 +184,7 @@ export default async function handler(req, res) {
             THEN substring(regexp_replace(COALESCE(mobile, ''), '[^0-9]', '', 'g') from 2)
           ELSE regexp_replace(COALESCE(mobile, ''), '[^0-9]', '', 'g')
         END = ${normalizedMobile}
-        LIMIT 1`;
+        LIMIT 1` : [];
       if (duplicateMobile[0]) return res.status(409).json({ error: "This mobile number is already registered. Please sign in to your existing account." });
       const sponsorRows = sponsorCode === "NA00501" ? [{ novopay_id: "NA00501" }] : await db`SELECT novopay_id FROM users WHERE status = 'active' AND (upper(COALESCE(referral_code, '')) = ${sponsorCode} OR upper(novopay_id) = ${sponsorCode}) LIMIT 1`;
       if (!sponsorRows[0]) return res.status(400).json({ error: "Referral ID is invalid or inactive. Check the ID and try again." });
