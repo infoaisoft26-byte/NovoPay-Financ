@@ -161,3 +161,34 @@
 @media(max-width:480px){.np-auth-footer{justify-content:center;text-align:center}.np-auth-footer span{width:100%;justify-content:center}}
 
 .np-user-footer{max-width:1480px;margin:24px auto 0;padding:18px 4px 4px;border-top:1px solid #e5eaf2;display:flex;justify-content:space-between;align-items:center;gap:12px;color:#8995a7;font-size:11px}.np-user-footer strong{color:#34435a;font-weight:800}@media(max-width:600px){.np-user-footer{flex-direction:column;align-items:center;text-align:center}}
+
+/* Admin package editor: create/update Basic and FD plan definitions */
+.np-admin-package-editor-panel{margin-bottom:18px}
+.np-admin-package-editor-panel>.np-admin-panel-heading{align-items:center}
+.np-admin-package-form{padding:20px;border-bottom:1px solid #edf0f5;background:#fbfcff}
+.np-admin-package-form-heading{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:17px}
+.np-admin-package-form-heading h3{font-family:Manrope,sans-serif;font-size:15px;margin:0 0 5px;color:#25344b}
+.np-admin-package-form-heading p{font-size:10px;line-height:1.6;color:#8491a4;margin:0}
+.np-admin-package-form-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px}
+.np-admin-package-form-grid label{display:flex;flex-direction:column;gap:7px;min-width:0;font-size:11px;font-weight:700;color:#46556c}
+.np-admin-package-form-grid input,.np-admin-package-form-grid select{width:100%;min-width:0;border:1px solid #dfe5ef;border-radius:9px;background:#fff;color:#23334b;padding:11px 12px;font-size:12px;outline:none}
+.np-admin-package-form-grid input:focus,.np-admin-package-form-grid select:focus{border-color:#7c96ed;box-shadow:0 0 0 3px #4169e116}
+.np-admin-package-form-grid .wide{grid-column:1/-1}
+.np-admin-package-calculations{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin-top:18px}
+.np-admin-package-calculations>div{min-width:0;border:1px solid #e5eaf3;border-radius:10px;padding:13px;background:#fff}
+.np-admin-package-calculations span,.np-admin-package-calculations b{display:block;overflow-wrap:anywhere}
+.np-admin-package-calculations span{font-size:10px;color:#8491a4;margin-bottom:8px}
+.np-admin-package-calculations b{font-family:Manrope,sans-serif;font-size:16px;color:#263955}
+.np-admin-package-note{font-size:10px;line-height:1.6;color:#8b97a8;margin:13px 0 0}
+.np-admin-package-form-actions{display:flex;justify-content:flex-end;gap:9px;margin-top:17px}
+.np-admin-action-button{display:inline-flex;align-items:center;justify-content:center;gap:6px;border:1px solid #e0e6ef;background:#fff;color:#51617a;border-radius:8px;padding:8px 10px;font-size:10px;font-weight:700;cursor:pointer;white-space:nowrap}
+.np-admin-action-button:disabled{opacity:.55;cursor:wait}
+.np-admin-action-button.success{background:#4169e1;border-color:#4169e1;color:#fff}
+.np-admin-action-button.success:hover{background:#3156ca}
+.np-admin-package-summary{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;padding:14px 19px;border-bottom:1px solid #edf0f5;background:#fff}
+.np-admin-package-summary>span{border:1px solid #e8edf5;border-radius:9px;padding:11px 12px;font-size:10px;color:#7d899c;min-width:0}
+.np-admin-package-summary b{display:block;font-family:Manrope,sans-serif;font-size:18px;color:#273954;margin-bottom:4px}
+.np-admin-record-row.has-actions{align-items:flex-start}
+.np-admin-row-actions{display:flex;flex-wrap:wrap;gap:7px;grid-column:1/-1;padding-top:4px}
+@media(max-width:900px){.np-admin-package-form-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:600px){.np-admin-package-form{padding:14px}.np-admin-package-form-grid{grid-template-columns:minmax(0,1fr)}.np-admin-package-form-grid .wide{grid-column:auto}.np-admin-package-calculations{grid-template-columns:1fr}.np-admin-package-calculations b{font-size:15px}.np-admin-package-summary{grid-template-columns:1fr;padding:12px}.np-admin-package-editor-panel>.np-admin-panel-heading{align-items:flex-start;flex-direction:column}.np-admin-package-editor-panel>.np-admin-panel-heading button{width:100%}.np-admin-package-form-actions{flex-direction:column-reverse}.np-admin-package-form-actions button{width:100%}.np-admin-row-actions{grid-column:1/-1}}
