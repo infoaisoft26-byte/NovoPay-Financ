@@ -29,10 +29,6 @@ export default async function handler(req, res) {
 
     if (!sql) sql = neon(databaseUrl);
 
-    if (code === "NA00501") {
-      return res.status(200).json({ valid: true, sponsor: { id: "NA00501", name: "NovoPay Finance" } });
-    }
-
     const rows = await sql`
       SELECT novopay_id,
              COALESCE(NULLIF(BTRIM(full_name), ''), 'NovoPay member') AS sponsor_name
