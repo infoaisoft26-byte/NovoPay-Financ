@@ -211,7 +211,7 @@ export default function AdminPanel({ user, onLogout }) {
       const response = await fetch("/api/admin-actions", {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: "Bearer " + token },
-        body: JSON.stringify({ action, reference: row.reference, id: row.id || row.novopay_id, status: action.endsWith("-status") ? (label.toLowerCase().includes("approve") ? "approved" : label.toLowerCase().includes("reject") ? "rejected" : label.toLowerCase().includes("suspend") ? "suspended" : label.toLowerCase().includes("activate") ? "active" : label.toLowerCase().includes("pause") ? "paused" : label.toLowerCase().includes("close") ? "closed" : label.toLowerCase().includes("resolve") ? "resolved" : "active") : undefined })
+        body: JSON.stringify({ action, reference: row.reference, id: row.novopay_id || row.id, status: action.endsWith("-status") ? (label.toLowerCase().includes("approve") ? "approved" : label.toLowerCase().includes("reject") ? "rejected" : label.toLowerCase().includes("suspend") ? "suspended" : label.toLowerCase().includes("activate") ? "active" : label.toLowerCase().includes("pause") ? "paused" : label.toLowerCase().includes("close") ? "closed" : label.toLowerCase().includes("resolve") ? "resolved" : "active") : undefined })
       });
       const payload = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(payload.error || "Admin action could not be completed.");
@@ -299,7 +299,7 @@ export default function AdminPanel({ user, onLogout }) {
 
           {section === "Overview" ? <>
             <div className="np-admin-welcome">
-              <div><span className="np-admin-welcome-icon"><ShieldCheck size={23}/></span><div><h2>Welcome to NovoPay Admin</h2><p>Admin modules are organized below. Live counts, records and financial actions require NovoPay's own database and server-side authorization.</p></div></div>
+              <div><span className="np-admin-welcome-icon"><ShieldCheck size={23}/></span><div><h2>Welcome to NovoPay Admin</h2><p>Manage NovoPay users, deposits, withdrawals, packages, reports and support from one control panel. Records refresh automatically.</p></div></div>
               <span className="np-admin-ready-pill"><span/> Login active</span>
             </div>
             <div className="np-admin-stat-grid">
@@ -324,7 +324,7 @@ export default function AdminPanel({ user, onLogout }) {
                 {quickLinks.map(item => { const Icon = item.icon; return <button className="np-admin-quick-link" key={item.label} onClick={() => selectSection(item.target)}><span className="np-admin-quick-icon"><Icon size={18}/></span><span><b>{item.label}</b><small>{item.desc}</small></span><ChevronRight size={17}/></button>; })}
               </section>
             </div>
-            <div className="np-admin-backend-banner"><Database size={19}/><div><b>{overviewCounts ? "Connected to NovoPay database" : "NovoPay backend status"}</b><p>{dataError || (overviewCounts ? "Counts above were loaded from the independent NovoPay database. Financial write actions remain disabled until audited transactional endpoints are implemented." : "The admin API is read-only and requires a dedicated NovoPay database plus a server-verified Firebase admin claim. No sample financial data is displayed.")}</p></div></div>
+            <div className="np-admin-backend-banner"><Database size={19}/><div><b>{overviewCounts ? "Connected to NovoPay database" : "NovoPay backend status"}</b><p>{dataError || (overviewCounts ? "Counts above were loaded from the independent NovoPay database. Admin review actions are protected by server-side authorization and are recorded in the NovoPay audit log." : "Live dashboard data requires the dedicated NovoPay database and a server-verified Firebase admin claim. No sample financial data is displayed.")}</p></div></div>
           </> : <section className="np-admin-panel np-admin-data-panel">
             <div className="np-admin-data-toolbar"><div className="np-admin-data-title"><span className="np-admin-stat-icon"><ActiveIcon size={19}/></span><div><h3>{section} management</h3><p>{descriptions[section]}</p></div></div>
               <label className="np-admin-search"><Search size={16}/><input value={query} onChange={e => setQuery(e.target.value)} placeholder={section === "Users" ? "Search by email or NovoPay ID" : "Search records"} /></label>
