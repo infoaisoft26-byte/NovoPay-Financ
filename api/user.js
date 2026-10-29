@@ -127,10 +127,14 @@ export default async function handler(req, res) {
       const displayName = String(req.body?.full_name || decoded.name || email.split("@")[0] || "Member").trim().slice(0, 120);
       const sponsorCode = String(req.body?.sponsor_code || "").trim().toUpperCase();
       const mobileInput = String(req.body?.mobile || "").trim();
-      const normalizedMobile = mobileInput.replace(/\D/g, "");
+      let normalizedMobile = mobileInput.replace(/\D/g, "");
+      // Store Indian mobile numbers canonically so 9876543210, 09876543210,
+      // and 919876543210 are treated as the same number.
+      if (normalizedMobile.length === 12 && normalizedMobile.startsWith("91")) normalizedMobile = normalizedMobile.slice(2);
+      else if (normalizedMobile.length === 11 && normalizedMobile.startsWith("0")) normalizedMobile = normalizedMobile.slice(1);
       const mobile = normalizedMobile;
       if (!displayName) return res.status(400).json({ error: "Please enter your full name." });
-      if (normalizedMobile.length < 10 || normalizedMobile.length > 15) return res.status(400).json({ error: "Enter 10-digit mobile number, or include country code such as +91." });
+      if (normalizedMobile.length < 10 || normalizedMobile.length > 15) return res.status(400).json({ error: "Mobile number sahi enter karein: 10 digits, ya +91 ke saath 12 digits." });
       if (!sponsorCode) return res.status(400).json({ error: "Referral ID is required to register." });
       await db`ALTER TABLE users ADD COLUMN IF NOT EXISTS mobile text`;
       await db`ALTER TABLE users ADD COLUMN IF NOT EXISTS referral_code text`;
