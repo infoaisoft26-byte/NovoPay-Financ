@@ -114,6 +114,35 @@ export default async function handler(req, res) {
         INSERT INTO audit_logs(actor_uid,action,entity_type,entity_id,details)
         SELECT ${actor.uid},'package_status_changed','package',id::text,jsonb_build_object('name',name,'status',status) FROM changed RETURNING id
       ) SELECT id,name,status FROM changed`;
+    } else if (action === "save-settings") {
+      const settings = body.settings;
+      if (!settings || typeof settings !== "object" || Array.isArray(settings)) return res.status(400).json({ error: "Settings payload is required." });
+      const commissions = Array.isArray(settings.commissions) ? settings.commissions.map(Number) : [];
+      if (commissions.length !== 15 || commissions.some(v => !Number.isFinite(v) || v < 0 || v > 100)) return res.status(400).json({ error: "Enter 15 commission percentages from 0 to 100." });
+      const address = String(settings.depositAddress || "").trim();
+      if (address && !/^0x[a-fA-F0-9]{40}$/.test(address)) return res.status(400).json({ error: "Deposit wallet must be a valid EVM address (0x + 40 hex characters)." });
+      const normalized = {
+        maintenanceMode: settings.maintenanceMode === true,
+        enforceWithdrawalTiming: settings.enforceWithdrawalTiming !== false,
+        depositAddress: address,
+        network: "BNB Smart Chain (BEP20)",
+        asset: "USDT",
+        walletLink: String(settings.walletLink || "").trim().slice(0, 500),
+        qrImageUrl: String(settings.qrImageUrl || "").trim().slice(0, 1000),
+        networkNotice: String(settings.networkNotice || "").trim().slice(0, 1000),
+        basicPackageVisible: settings.basicPackageVisible !== false,
+        fdPackageVisible: settings.fdPackageVisible !== false,
+        depositVisible: settings.depositVisible !== false,
+        brochurePdfUrl: String(settings.brochurePdfUrl || "").trim().slice(0, 1000),
+        commissions
+      };
+      await db`CREATE TABLE IF NOT EXISTS system_settings (setting_key text PRIMARY KEY, setting_value jsonb NOT NULL DEFAULT '{}'::jsonb, updated_at timestamptz NOT NULL DEFAULT now(), updated_by text)`;
+      result = await db`INSERT INTO system_settings(setting_key,setting_value,updated_at,updated_by)
+        VALUES ('platform',${JSON.stringify(normalized)}::jsonb,now(),${actor.uid})
+        ON CONFLICT (setting_key) DO UPDATE SET setting_value=EXCLUDED.setting_value,updated_at=now(),updated_by=EXCLUDED.updated_by
+        RETURNING setting_key,updated_at`;
+      await db`INSERT INTO audit_logs(actor_uid,action,entity_type,entity_id,details)
+        VALUES (${actor.uid},'system_settings_saved','system_settings','platform',${JSON.stringify({maintenanceMode:normalized.maintenanceMode,enforceWithdrawalTiming:normalized.enforceWithdrawalTiming,depositAddressConfigured:!!address,commissions:normalized.commissions})}::jsonb)`;
     } else {
       return res.status(400).json({ error: "Unsupported action or missing record details." });
     }
