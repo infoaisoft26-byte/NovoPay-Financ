@@ -84,49 +84,49 @@ const sectionSlugs = {
 };
 
 function recordCells(section, row) {
-  const amount = (value, currency = "USDT") => value == null ? "—" : String(value) + " " + currency;
+  const amount = (value, currency = "USDT") => value == null || value === "" ? "—" : Number.isFinite(Number(value)) ? Number(value).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 8 }) + " " + currency : String(value) + " " + currency;
+  const stamp = value => value ? new Date(value).toLocaleString() : "—";
   switch (section) {
-    case "Users": return [String(row.novopay_id || row.id) + " · " + (row.full_name || "") + " · " + (row.email || ""), row.status, "Fund: " + amount(row.fund_balance) + " / Income: " + amount(row.income_balance)];
-    case "KYC Approvals": return [row.user_id, row.status, (row.document_type || "Document") + " · " + (row.reviewed_at || "Not reviewed")];
-    case "Deposits": return [row.reference, row.status, amount(row.amount, row.currency) + " · " + (row.tx_hash || "No TX hash")];
-    case "Withdrawals": return [row.reference, row.status, amount(row.amount, row.currency) + " · fee " + row.fee + " · net " + row.net_amount];
-    case "Transactions": return [row.reference, row.type + " · " + row.status, row.user_id + " · " + amount(row.amount, row.currency)];
-    case "P2P Transfers": return [row.reference, row.status, row.sender_user_id + " → " + row.receiver_user_id + " · " + amount(row.amount, row.currency)];
-    case "Packages": return [row.name, row.status, amount(row.price, row.currency) + " · " + (row.description || "")];
-    case "Package Activations": return [row.reference, row.status, row.user_id + " · " + (row.package_id || "No package") + " · " + amount(row.amount, row.currency)];
-    case "Support Tickets": return [row.reference, row.status, row.user_id + " · " + row.subject];
-    case "Website Feedback": return [row.id, row.status, (row.user_id || "Anonymous") + " · " + row.message];
-    case "Survey Responses": return [row.id, row.survey_key, JSON.stringify(row.response)];
-    case "Audit Logs": return [row.id, row.actor_uid, row.action + " · " + (row.entity_type || "") + " · " + (row.entity_id || "")];
-    case "Offer Posters": return [row.title, row.status, row.image_url];
-    case "Reports": return [row.name, row.status, row.details];
-    case "Income Reports": return [(row.user_id || "—") + " · " + (row.full_name || "Member"), row.income_category || row.type, (row.reference || row.id || "—") + " · " + amount(row.amount, row.currency) + " · " + row.status + " · " + (row.created_at || "")];
-    case "Income Leaderboard": return [row.novopay_id + " · " + (row.full_name || ""), String(row.total_investment || "0") + " USDT", "Sponsor: " + (row.sponsor_user_id || "—") + " · Direct: " + row.direct_members];
-    case "Settings": return [row.name, row.status, row.details];
-    default: return [row.id || "—", row.status || "—", "—"];
+    case "Users": return [row.novopay_id || row.id || "—", row.full_name || "Member", row.email || "—", row.status || "unknown", "Fund " + amount(row.fund_balance) + " · Income " + amount(row.income_balance)];
+    case "KYC Approvals": return [row.reference || row.id || "—", row.user_id || "—", row.document_type || "Document", row.status || "pending", stamp(row.created_at || row.reviewed_at)];
+    case "Deposits": return [row.reference || "—", row.user_id || "—", amount(row.amount, row.currency), row.status || "pending", row.tx_hash || "TX hash not submitted"];
+    case "Withdrawals": return [row.reference || "—", row.user_id || "—", amount(row.amount, row.currency), "Fee " + amount(row.fee, row.currency) + " · Net " + amount(row.net_amount, row.currency), row.status || "pending"];
+    case "Transactions": return [row.reference || "—", row.user_id || "—", row.type || "—", amount(row.amount, row.currency), row.status || "—"];
+    case "P2P Transfers": return [row.reference || "—", row.sender_user_id || "—", row.receiver_user_id || "—", amount(row.amount, row.currency), row.status || "—"];
+    case "Packages": return [row.name || "—", row.package_type || "—", amount(row.price, row.currency), (row.roi_rate == null ? "—" : row.roi_rate + "%") + " · " + (row.duration_days == null ? "—" : row.duration_days + " days"), row.status || "—"];
+    case "Package Activations": return [row.reference || "—", row.user_id || "—", row.package_name || row.package_id || "Package", amount(row.amount, row.currency), row.status || "—"];
+    case "Support Tickets": return [row.reference || row.id || "—", row.user_id || "—", row.subject || "Support request", row.status || "open", stamp(row.created_at || row.updated_at)];
+    case "Website Feedback": return [row.id || "—", row.user_id || "Anonymous", row.rating == null ? "—" : row.rating + "/5", row.message || "—", stamp(row.created_at)];
+    case "Survey Responses": return [row.id || "—", row.user_id || "—", row.survey_key || "Survey", row.status || "submitted", JSON.stringify(row.response || {})];
+    case "Audit Logs": return [row.id || "—", row.actor_uid || "System", row.action || "—", (row.entity_type || "record") + " · " + (row.entity_id || "—"), stamp(row.created_at)];
+    case "Offer Posters": return [row.id || "—", row.title || "—", row.status || "draft", row.image_url || "—", stamp(row.updated_at || row.created_at)];
+    case "Reports": return [row.name || "Report", row.status || "—", row.details || "—", stamp(row.updated_at || row.created_at), row.id || "—"];
+    case "Income Reports": return [row.user_id || "—", row.full_name || "Member", row.income_category || row.type || "Income", amount(row.amount, row.currency), (row.status || "—") + " · " + stamp(row.created_at)];
+    case "Income Leaderboard": return [row.rank == null ? "—" : "#" + row.rank, row.novopay_id || "—", row.full_name || "Member", amount(row.total_investment), "Level " + (row.level || "—") + " · Direct " + (row.direct_members ?? "—")];
+    case "Settings": return [row.name || "Setting", row.status || "—", row.details || "—", stamp(row.updated_at), row.id || "—"];
+    default: return [row.id || row.reference || "—", row.user_id || "—", row.type || row.name || "Record", row.status || "—", stamp(row.created_at || row.updated_at)];
   }
 }
 
 const tableColumns = {
-  Users: ["USER / NOVOPAY ID", "ACCOUNT STATUS", "WALLET SUMMARY"],
-  "KYC Approvals": ["SUBMISSION", "REVIEW STATUS", "DECISION"],
-  Deposits: ["DEPOSIT REF", "STATUS", "AMOUNT / TX HASH"],
-  Withdrawals: ["WITHDRAWAL REF", "STATUS", "AMOUNT / FEE"],
-  Transactions: ["LEDGER REF", "TYPE / STATUS", "ACCOUNT / AMOUNT"],
-  "P2P Transfers": ["TRANSFER REF", "STATUS", "SENDER / RECEIVER"],
-  Packages: ["PACKAGE", "STATUS", "PRICE / RULES"],
-  "Package Activations": ["ACTIVATION REF", "STATUS", "USER / PACKAGE"],
-  Reports: ["REPORT", "DATA STATUS", "LAST UPDATED"],
-  "Income Reports": ["MEMBER / NP ID", "INCOME CATEGORY", "LEDGER / AMOUNT / STATUS"],
-  "Income Leaderboard": ["RANK / USER ID", "VERIFIED TOTAL", "LEVEL DETAILS"],
-  "Support Tickets": ["TICKET REF", "STATUS", "USER / SUBJECT"],
-  "Website Feedback": ["FEEDBACK REF", "STATUS", "SUBMISSION"],
-  "Survey Responses": ["RESPONSE REF", "STATUS", "SUBMISSION"],
-  "Audit Logs": ["EVENT REF", "ACTOR", "ACTION / TIME"],
-  "Offer Posters": ["POSTER", "PUBLISH STATUS", "UPDATED"],
-  Settings: ["SETTING", "CURRENT STATUS", "DETAILS"],
+  Users: ["NOVOPAY ID", "MEMBER NAME", "EMAIL", "ACCOUNT STATUS", "WALLET BALANCES"],
+  "KYC Approvals": ["SUBMISSION ID", "USER ID", "DOCUMENT", "REVIEW STATUS", "SUBMITTED / REVIEWED"],
+  Deposits: ["DEPOSIT REF", "USER ID", "AMOUNT", "STATUS", "BLOCKCHAIN TX HASH"],
+  Withdrawals: ["WITHDRAWAL REF", "USER ID", "REQUESTED", "FEE / NET PAYABLE", "STATUS"],
+  Transactions: ["LEDGER REF", "USER ID", "TRANSACTION TYPE", "AMOUNT", "STATUS"],
+  "P2P Transfers": ["TRANSFER REF", "SENDER ID", "RECEIVER ID", "AMOUNT", "STATUS"],
+  Packages: ["PACKAGE NAME", "TYPE", "PRICE", "ROI / DURATION", "STATUS"],
+  "Package Activations": ["ACTIVATION REF", "USER ID", "PACKAGE", "AMOUNT", "STATUS"],
+  Reports: ["REPORT", "STATUS", "SUMMARY", "UPDATED", "RECORD ID"],
+  "Income Reports": ["USER ID", "MEMBER", "INCOME TYPE", "AMOUNT", "STATUS / DATE"],
+  "Income Leaderboard": ["RANK", "NOVOPAY ID", "MEMBER", "TOTAL INVESTMENT", "LEVEL / TEAM"],
+  "Support Tickets": ["TICKET REF", "USER ID", "SUBJECT", "STATUS", "LAST UPDATED"],
+  "Website Feedback": ["FEEDBACK ID", "USER", "RATING", "MESSAGE", "SUBMITTED"],
+  "Survey Responses": ["RESPONSE ID", "USER ID", "SURVEY", "STATUS", "RESPONSE DETAILS"],
+  "Audit Logs": ["EVENT ID", "ADMIN / ACTOR", "ACTION", "ENTITY", "DATE / TIME"],
+  "Offer Posters": ["POSTER ID", "TITLE", "STATUS", "IMAGE", "UPDATED"],
+  Settings: ["SETTING", "STATUS", "DETAILS", "UPDATED", "RECORD ID"],
 };
-
 export default function AdminPanel({ user, onLogout }) {
   const [section, setSection] = useState("Overview");
   const [mobileOpen, setMobileOpen] = useState(false);
