@@ -20,6 +20,7 @@ export default function App() {
   const [mode, setMode] = useState("login");
   const [user, setUser] = useState(null);
   const [name, setName] = useState("");
+  const [mobile, setMobile] = useState("");
   const [sponsorCode, setSponsorCode] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -69,7 +70,7 @@ export default function App() {
     event.preventDefault();
     setNotice("");
     if (!firebaseConfigured || !auth) {
-      setNotice("Login setup abhi complete nahi hai. Firebase configuration check karein.");
+      setNotice("We could not process your request right now. Please try again later.");
       return;
     }
     if (mode === "register" && email.trim().toLowerCase() === ADMIN_EMAIL) {
@@ -80,7 +81,9 @@ export default function App() {
     try {
       if (mode === "register") {
         const code = sponsorCode.trim().toUpperCase();
-        if (!code) throw new Error("Sponsor ID is required to register.");
+        if (!name.trim()) throw new Error("Please enter your full name.");
+        if (!/^\+?[0-9\s()-]{10,18}$/.test(mobile.trim()) || mobile.replace(/\D/g, "").length < 10 || mobile.replace(/\D/g, "").length > 15) throw new Error("Please enter a valid mobile number.");
+        if (!code) throw new Error("Referral ID is required to register.");
         const validationResponse = await fetch("/api/referral-check?code=" + encodeURIComponent(code), { cache: "no-store" });
         const validation = await validationResponse.json().catch(() => ({}));
         if (!validationResponse.ok || !validation.valid) throw new Error(validation.error || "Sponsor ID is invalid or inactive.");
@@ -88,7 +91,7 @@ export default function App() {
         try {
           if (name.trim()) await updateProfile(credential.user, { displayName: name.trim() });
           const token = await credential.user.getIdToken();
-          const profileResponse = await fetch("/api/user", { method: "POST", headers: { Authorization: "Bearer " + token, "Content-Type": "application/json" }, body: JSON.stringify({ action: "ensure-profile", full_name: name.trim(), sponsor_code: code }), cache: "no-store" });
+          const profileResponse = await fetch("/api/user", { method: "POST", headers: { Authorization: "Bearer " + token, "Content-Type": "application/json" }, body: JSON.stringify({ action: "ensure-profile", full_name: name.trim(), mobile: mobile.trim(), sponsor_code: code }), cache: "no-store" });
           const profileResult = await profileResponse.json().catch(() => ({}));
           if (!profileResponse.ok) throw new Error(profileResult.error || "Registration profile could not be created.");
         } catch (profileError) { await deleteUser(credential.user).catch(() => {}); throw profileError; }
@@ -110,9 +113,9 @@ export default function App() {
         "auth/weak-password": "Password kam se kam 6 characters ka hona chahiye.",
         "auth/invalid-email": "Valid email address enter karein.",
         "auth/too-many-requests": "Bahut attempts hue hain. Thodi der baad try karein.",
-        "auth/operation-not-allowed": "Firebase Console mein Email/Password sign-in enable karein.",
+        "auth/operation-not-allowed": "Registration is temporarily unavailable. Please try again later.",
       };
-      setNotice(messages[error.code] || error.message || "Request complete nahi ho saki. Dobara try karein.");
+      setNotice(messages[error.code] || (mode === "register" ? (error.message || "Registration could not be completed. Please check your details and try again.") : "We could not sign you in. Please check your details and try again."));
     } finally {
       setBusy(false);
     }
@@ -121,7 +124,7 @@ export default function App() {
   async function handleReset() {
     setNotice("");
     if (!firebaseConfigured || !auth) {
-      setNotice("Firebase configuration abhi complete nahi hai.");
+      setNotice("This service is temporarily unavailable. Please try again later.");
       return;
     }
     if (!email.trim()) {
@@ -148,7 +151,7 @@ export default function App() {
     const signedIn = Boolean(user);
     const isAdmin = user?.email?.toLowerCase() === ADMIN_EMAIL;
     if (!signedIn) {
-      return <AuthScreen {...{ mode, setMode, name, setName, email, setEmail, password, setPassword, showPassword, setShowPassword, busy, notice, setNotice, handleSubmit, handleReset, navigate, isAdminPath }} />;
+      return <AuthScreen {...{ mode, setMode, name, setName, mobile, setMobile, sponsorCode, setSponsorCode, email, setEmail, password, setPassword, showPassword, setShowPassword, busy, notice, setNotice, handleSubmit, handleReset, navigate, isAdminPath }} />;
     }
     if (isAdminPath && !isAdmin) {
       return (
@@ -195,7 +198,7 @@ export default function App() {
   return <AuthScreen {...{ mode, setMode, name, setName, email, setEmail, password, setPassword, showPassword, setShowPassword, busy, notice, setNotice, handleSubmit, handleReset, navigate, isAdminPath }} />;
 }
 
-function AuthScreen({ mode, setMode, name, setName, email, setEmail, password, setPassword, showPassword, setShowPassword, busy, notice, setNotice, handleSubmit, handleReset, navigate, isAdminPath }) {
+function AuthScreen({ mode, setMode, name, setName, mobile, setMobile, sponsorCode, setSponsorCode, email, setEmail, password, setPassword, showPassword, setShowPassword, busy, notice, setNotice, handleSubmit, handleReset, navigate, isAdminPath }) {
   const adminLogin = Boolean(isAdminPath);
   return (
     <main className="np-auth-page">
@@ -207,10 +210,10 @@ function AuthScreen({ mode, setMode, name, setName, email, setEmail, password, s
             <span className="np-brand-mark"><WalletCards size={23} /></span><span>NovoPay <b>Finance</b></span>
           </a>
           <div className="np-intro-copy">
-            <span className="np-kicker"><span className="np-live-dot" /> SECURE ACCOUNT ACCESS</span>
+            <span className="np-kicker"><span className="np-live-dot" /> WELCOME TO NOVOPAY FINANCE</span>
             <h1>{adminLogin ? "Admin access." : "Welcome back."}<br /><span>{adminLogin ? "Control NovoPay." : "Your finance space."}</span></h1>
             <p>{adminLogin ? "Sign in with the authorized NovoPay administrator account to access the admin area." : "Sign in to your account or create one to get started with NovoPay Finance."}</p>
-            <div className="np-trust"><ShieldCheck size={18} /><span>Secure sign-in powered by Firebase Authentication</span></div>
+            <div className="np-trust"><ShieldCheck size={18} /><span>Your account is protected with secure sign-in</span></div>
           </div>
         </div>
         <section className="np-auth-card">
@@ -226,22 +229,24 @@ function AuthScreen({ mode, setMode, name, setName, email, setEmail, password, s
           <form onSubmit={handleSubmit}>
             {mode === "register" && !adminLogin && (
               <>
-                <label className="np-field"><span>Full name</span><input value={name} onChange={(e) => setName(e.target.value)} placeholder="Enter your full name" autoComplete="name" required /></label>
-                <label className="np-field"><span>Sponsor / Referral ID</span><input value={sponsorCode} onChange={(e) => setSponsorCode(e.target.value.toUpperCase())} placeholder="Enter sponsor ID" autoComplete="off" required /></label>
+                <label className="np-field"><span>Full name</span><input value={name} onChange={(e) => setName(e.target.value)} placeholder="Enter your full name" autoComplete="name" maxLength={120} required /></label>
+                <label className="np-field"><span>Email address</span><input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@example.com" autoComplete="email" required /></label>
+                <label className="np-field"><span>Mobile number</span><input type="tel" inputMode="tel" value={mobile} onChange={(e) => setMobile(e.target.value)} placeholder="Enter mobile number" autoComplete="tel" minLength={10} maxLength={18} pattern="\\+?[0-9 ()-]{10,18}" required /></label>
+                <label className="np-field"><span>Referral ID</span><input value={sponsorCode} onChange={(e) => setSponsorCode(e.target.value.toUpperCase())} placeholder="Enter referral ID" autoComplete="off" maxLength={80} required /></label>
               </>
             )}
-            <label className="np-field"><span>Email address</span><input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@example.com" autoComplete="email" required /></label>
+            {mode !== "register" && <label className="np-field"><span>Email address</span><input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@example.com" autoComplete="email" required /></label>}
             <label className="np-field"><span>Password</span><span className="np-password-wrap"><input type={showPassword ? "text" : "password"} value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Enter your password" autoComplete={mode === "register" ? "new-password" : "current-password"} minLength={6} required /><button type="button" aria-label={showPassword ? "Hide password" : "Show password"} onClick={() => setShowPassword(!showPassword)}>{showPassword ? <EyeOff size={18} /> : <Eye size={18} />}</button></span></label>
             {mode === "login" && !adminLogin && <button type="button" className="np-forgot" onClick={handleReset}>Forgot password?</button>}
             <button className="np-primary np-submit" type="submit" disabled={busy}>{busy ? "Please wait…" : mode === "register" && !adminLogin ? "Create account" : "Login"} <ArrowRight size={17} /></button>
           </form>
           {notice && <p className="np-notice" role="status">{notice}</p>}
-          {!firebaseConfigured && <p className="np-notice">Firebase setup pending: required VITE_FIREBASE environment variables configure karein.</p>}
+          
           {adminLogin && <button className="np-back-link" onClick={() => { setMode("login"); navigate("/"); }}>← Back to user login</button>}
-          {!adminLogin && <><p className="np-legal">By continuing, you agree to use NovoPay responsibly. Account and financial services are not enabled yet.</p><button type="button" className="np-admin-link" onClick={() => { setMode("login"); navigate("/admin/login"); }}>Admin login</button></>}
+          {!adminLogin && <><p className="np-legal">By continuing, you agree to NovoPay Finance’s account terms and responsible-use policy.</p><button type="button" className="np-admin-link" onClick={() => { setMode("login"); navigate("/admin/login"); }}>Admin login</button></>}
         </section>
       </section>
-      <footer className="np-auth-footer"><span>© NovoPay Finance</span><span><LockKeyhole size={14} /> Protected account access</span></footer>
+      <footer className="np-auth-footer"><span>© {new Date().getFullYear()} NovoPay Finance</span><span>Developed by <strong>AISOFT Studio</strong></span></footer>
     </main>
   );
 }
