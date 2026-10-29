@@ -195,12 +195,20 @@ export default async function handler(req, res) {
     if (section === "brochure") return res.status(200).json({ ok: true, section, user: profile, brochureUrl, maintenanceMode, platformSettings });
     const query = queries[section];
     if (!query) return res.status(400).json({ error: "Unknown account section." });
-    const rows = await query(db, profile.novopay_id, pattern, limit);
+    let rows = await query(db, profile.novopay_id, pattern, limit);
+    if (["packages", "basic-package", "fd-package"].includes(section)) {
+      rows = rows.filter(row => {
+        const kind = String(row.package_type || row.name || "").toLowerCase();
+        if (kind.includes("basic") && platformSettings.basicPackageVisible === false) return false;
+        if ((kind === "fd" || kind.includes("fixed deposit") || kind.startsWith("fd ")) && platformSettings.fdPackageVisible === false) return false;
+        return true;
+      });
+    }
     if (section === "packages") {
       const activations = await queries.activations(db, profile.novopay_id, pattern, limit);
       return res.status(200).json({ ok: true, section, user: profile, rows, activations, depositAddress, brochureUrl, maintenanceMode, platformSettings });
     }
-    return res.status(200).json({ ok: true, section, user: profile, rows, depositAddress, brochureUrl });
+    return res.status(200).json({ ok: true, section, user: profile, rows, depositAddress, brochureUrl, maintenanceMode, platformSettings });
   } catch (error) {
     const status = error?.status || 500;
     if (status === 503 || status === 401) return res.status(status).json({ error: error.message });
