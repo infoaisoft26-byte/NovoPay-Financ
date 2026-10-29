@@ -118,3 +118,6 @@ html,body,#root{width:100%;min-width:0;max-width:100%;margin:0}
 @media(max-width:1180px){.np-user-main{width:calc(100% - 230px);max-width:calc(100% - 230px)}.np-user-cap-stats{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:760px){.np-user-main{width:100%;max-width:100%}.np-user-cap-stats{grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}.np-user-cap-card{padding:16px 13px;overflow:hidden}.np-user-cap-head{gap:10px;flex-wrap:wrap}.np-user-cap-head h2{font-size:17px;overflow-wrap:anywhere}.np-user-cap-head p{font-size:10px;line-height:1.5}.np-user-cap-stats>*{padding:11px 9px}}
 @media(max-width:360px){.np-user-cap-stats{grid-template-columns:minmax(0,1fr)}}
+
+/* NovoPay logo in member/admin sidebars */
+.np-sidebar-logo{display:block;width:190px;max-width:100%;height:auto;max-height:58px;object-fit:contain;object-position:left center;margin-bottom:6px}.np-user-brand,.np-admin-brand-name{min-width:0;flex:1}.np-user-brand small,.np-admin-brand-name small{margin-top:5px}
