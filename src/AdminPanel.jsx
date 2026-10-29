@@ -13,24 +13,24 @@ const navGroups = [
     { label: "Overview", icon: LayoutDashboard },
     { label: "Users", icon: Users },
     { label: "KYC Approvals", icon: UserCheck },
-    { label: "Deposits", icon: ArrowDownToLine },
-    { label: "Withdrawals", icon: ArrowUpFromLine },
-    { label: "Transactions", icon: ReceiptText },
-    { label: "P2P Transfers", icon: ArrowLeftRight },
+    { label: "Deposits", navLabel: "USDT Recharge", icon: ArrowDownToLine },
+    { label: "Withdrawals", navLabel: "Withdrawal Management", icon: ArrowUpFromLine },
+    { label: "Transactions", navLabel: "Transaction Requests", icon: ReceiptText },
+    { label: "P2P Transfers", navLabel: "P2P & GF ID Accounting", icon: ArrowLeftRight },
   ]},
   { title: "FINANCE & PACKAGES", items: [
-    { label: "Packages", icon: Package },
+    { label: "Packages", navLabel: "Package Management", icon: Package },
     { label: "Package Activations", icon: PackageCheck },
     { label: "Reports", icon: ChartNoAxesCombined },
     { label: "Income Leaderboard", icon: Trophy },
   ]},
   { title: "OPERATIONS & SECURITY", items: [
     { label: "Support Tickets", icon: LifeBuoy },
-    { label: "Website Feedback", icon: MessageSquare },
+    { label: "Website Feedback", navLabel: "Website Reviews", icon: MessageSquare },
     { label: "Survey Responses", icon: ClipboardList },
     { label: "Audit Logs", icon: ScrollText },
-    { label: "Offer Posters", icon: Megaphone },
-    { label: "Settings", icon: Settings },
+    { label: "Offer Posters", navLabel: "Offer Poster", icon: Megaphone },
+    { label: "Settings", navLabel: "System Settings", icon: Settings },
   ]},
 ];
 
@@ -288,7 +288,7 @@ export default function AdminPanel({ user, onLogout }) {
             {group.items.map(item => {
               const Icon = item.icon;
               return <button key={item.label} className={`np-admin-nav-item ${section === item.label ? "active" : ""}`} onClick={() => selectSection(item.label)}>
-                <Icon size={18}/><span>{item.label}</span>{section === item.label && <ChevronRight className="np-admin-nav-chevron" size={15}/>}
+                <Icon size={18}/><span>{item.navLabel || item.label}</span>{section === item.label && <ChevronRight className="np-admin-nav-chevron" size={15}/>}
               </button>;
             })}
           </div>)}
