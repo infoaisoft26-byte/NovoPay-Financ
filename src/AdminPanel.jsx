@@ -5,7 +5,7 @@ import {
   CircleHelp, RefreshCw, ChevronRight, WalletCards, Database, LogOut,
   CircleUserRound, FileText, Activity, UserCheck, LifeBuoy, Trophy,
   ArrowLeftRight, ClipboardList, Megaphone, ScrollText, MessageSquare,
-  PackageCheck, ShieldAlert, Network, Gauge, Download
+  PackageCheck, ShieldAlert, Network, Gauge, Download, Plus, Pencil, Save
 } from "lucide-react";
 
 const navGroups = [
@@ -136,6 +136,9 @@ export default function AdminPanel({ user, onLogout }) {
   const [loadingData, setLoadingData] = useState(false);
   const [settingUpAdmin, setSettingUpAdmin] = useState(false);
   const [actionBusy, setActionBusy] = useState("");
+  const blankPackage = { id: "", name: "", package_code: "", package_type: "basic", price: "2", roi_rate: "5", duration_days: "25", description: "", status: "active" };
+  const [packageForm, setPackageForm] = useState(blankPackage);
+  const [packageEditorOpen, setPackageEditorOpen] = useState(false);
   const [platformSettings, setPlatformSettings] = useState({ maintenanceMode:false, enforceWithdrawalTiming:true, depositAddress:"", network:"BNB Smart Chain (BEP20)", asset:"USDT", walletLink:"", qrImageUrl:"", networkNotice:"Only USDT on BNB Smart Chain (BEP20) is accepted.", basicPackageVisible:true, fdPackageVisible:true, depositVisible:true, brochurePdfUrl:"", commissions:[5,1,1,1,1,1,1,1,1,1,1,1,0.5,0.5,0.5] });
   const [reloadKey, setReloadKey] = useState(0);
   const sections = useMemo(() => navGroups.flatMap(g => g.items), []);
@@ -196,6 +199,54 @@ export default function AdminPanel({ user, onLogout }) {
     const interval = window.setInterval(() => setReloadKey(value => value + 1), 15000);
     return () => window.clearInterval(interval);
   }, []);
+
+  function startNewPackage() {
+    setPackageForm({ ...blankPackage, package_code: "BASIC_" + Date.now().toString().slice(-6) });
+    setPackageEditorOpen(true);
+    setDataError("");
+    setNotice("");
+  }
+
+  function startEditPackage(row) {
+    setPackageForm({
+      id: row.id || "",
+      name: row.name || "",
+      package_code: row.package_code || "",
+      package_type: String(row.package_type || "basic").toLowerCase() === "fd" ? "fd" : "basic",
+      price: String(row.price ?? ""),
+      roi_rate: String(row.roi_rate ?? ""),
+      duration_days: String(row.duration_days ?? ""),
+      description: row.description || "",
+      status: row.status || "active",
+    });
+    setPackageEditorOpen(true);
+    setDataError("");
+    setNotice("");
+  }
+
+  async function savePackage(event) {
+    event.preventDefault();
+    setActionBusy("package-save");
+    setDataError("");
+    setNotice("");
+    try {
+      const token = await user.getIdToken();
+      const response = await fetch("/api/admin-actions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: "Bearer " + token },
+        body: JSON.stringify({ action: "package-save", ...packageForm }),
+      });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(payload.error || "Package could not be saved.");
+      setPackageEditorOpen(false);
+      setNotice(packageForm.id ? "Package updated. New settings apply to future activations and settlements; existing wallet credits are unchanged." : "New package created and saved.");
+      setReloadKey(value => value + 1);
+    } catch (error) {
+      setDataError(error.message || "Package could not be saved.");
+    } finally {
+      setActionBusy("");
+    }
+  }
 
   async function savePlatformSettings() {
     setActionBusy("save-settings"); setDataError(""); setNotice("");
@@ -320,6 +371,32 @@ export default function AdminPanel({ user, onLogout }) {
           {notice && <div className="np-admin-notice" role="status"><CircleHelp size={17}/><span>{notice}</span><button onClick={() => setNotice("")} aria-label="Dismiss"><X size={16}/></button></div>}
           {dataError.includes("Admin server permission is not set") && <div className="np-admin-inline-error" role="alert"><ShieldAlert size={17}/><span>Admin permission setup is required for this Firebase account.</span><button className="np-admin-refresh" disabled={settingUpAdmin} onClick={async () => { setSettingUpAdmin(true); setDataError(""); try { const token = await user.getIdToken(true); const response = await fetch("/api/setup-admin", { method: "POST", headers: { Authorization: "Bearer " + token } }); const payload = await response.json().catch(() => ({})); if (!response.ok) throw new Error(payload.error || "Admin setup could not be completed."); await user.getIdToken(true); setDataError(""); setNotice("Admin access setup complete. Loading your admin records."); setReloadKey(value => value + 1); } catch (error) { setDataError(error.message || "Admin setup could not be completed."); } finally { setSettingUpAdmin(false); } }}>{settingUpAdmin ? "Setting up…" : "Set up admin access"}</button></div>}
 
+          {section === "Packages" && <section className="np-admin-panel np-admin-package-editor-panel">
+            <div className="np-admin-panel-heading">
+              <div><h3>Package Management</h3><p>Create and edit Basic and FD package definitions. Daily return, total profit and maturity amount recalculate automatically.</p></div>
+              <button className="np-admin-action-button success" onClick={startNewPackage}><Plus size={15}/> New Package</button>
+            </div>
+            {packageEditorOpen && <form className="np-admin-package-form" onSubmit={savePackage}>
+              <div className="np-admin-package-form-heading"><div><h3>{packageForm.id ? "Edit Package" : "New Package"}</h3><p>Saved values are used for future package activations.</p></div><button type="button" className="np-admin-icon-button" aria-label="Close package editor" onClick={()=>setPackageEditorOpen(false)}><X size={17}/></button></div>
+              <div className="np-admin-package-form-grid">
+                <label>Package Name<input required maxLength={120} value={packageForm.name} onChange={e=>setPackageForm(v=>({...v,name:e.target.value}))} placeholder="Base Plan 1"/></label>
+                <label>Package Code<input required maxLength={60} value={packageForm.package_code} onChange={e=>setPackageForm(v=>({...v,package_code:e.target.value.toUpperCase().replace(/[^A-Z0-9_-]/g,"_")}))} placeholder="GF_BASE_01"/></label>
+                <label>Package Type<select value={packageForm.package_type} onChange={e=>setPackageForm(v=>({...v,package_type:e.target.value}))}><option value="basic">Basic Package</option><option value="fd">FD Package</option></select></label>
+                <label>Plan Amount (USDT)<input required type="number" min="0.00000001" max="100000000" step="0.00000001" value={packageForm.price} onChange={e=>setPackageForm(v=>({...v,price:e.target.value}))}/></label>
+                <label>Daily Return (%)<input required type="number" min="0" max="100" step="0.01" value={packageForm.roi_rate} onChange={e=>setPackageForm(v=>({...v,roi_rate:e.target.value}))}/></label>
+                <label>Duration (days)<input required type="number" min="1" max="36500" step="1" value={packageForm.duration_days} onChange={e=>setPackageForm(v=>({...v,duration_days:e.target.value}))}/></label>
+                <label>Status<select value={packageForm.status} onChange={e=>setPackageForm(v=>({...v,status:e.target.value}))}><option value="active">Active & visible</option><option value="paused">Paused</option><option value="draft">Draft</option><option value="archived">Archived</option></select></label>
+                <label className="wide">Description<input maxLength={1000} value={packageForm.description} onChange={e=>setPackageForm(v=>({...v,description:e.target.value}))} placeholder="Optional package details"/></label>
+              </div>
+              <div className="np-admin-package-calculations">
+                <div><span>Daily Return Amount</span><b>{(Math.max(0,Number(packageForm.price)||0)*Math.max(0,Number(packageForm.roi_rate)||0)/100).toLocaleString("en-US",{maximumFractionDigits:8})} USDT</b></div>
+                <div><span>Total Profit</span><b>{(Math.max(0,Number(packageForm.price)||0)*Math.max(0,Number(packageForm.roi_rate)||0)/100*Math.max(0,Number(packageForm.duration_days)||0)).toLocaleString("en-US",{maximumFractionDigits:8})} USDT</b></div>
+                <div><span>Maturity Amount</span><b>{(Math.max(0,Number(packageForm.price)||0)*(1+Math.max(0,Number(packageForm.roi_rate)||0)/100*Math.max(0,Number(packageForm.duration_days)||0))).toLocaleString("en-US",{maximumFractionDigits:8})} USDT</b></div>
+              </div>
+              <p className="np-admin-package-note">Simple daily return calculation: plan amount × daily rate × duration. Calculations are estimates and do not guarantee earnings.</p>
+              <div className="np-admin-package-form-actions"><button type="button" className="np-admin-action-button" onClick={()=>setPackageEditorOpen(false)}>Cancel</button><button type="submit" className="np-admin-action-button success" disabled={actionBusy==="package-save"}><Save size={15}/>{actionBusy==="package-save" ? "Saving…" : "Save Package"}</button></div>
+            </form>}
+          </section>}
           {section === "Settings" ? <section className="np-admin-panel np-admin-settings-panel">
             <div className="np-admin-panel-heading"><div><h3>System Settings</h3><p>Manage NovoPay system controls and USDT BEP20 deposit details. Changes are saved to the NovoPay database.</p></div><span className="np-admin-live-label"><span/> Persistent settings</span></div>
             {dataError && <div className="np-admin-inline-error" role="alert"><ShieldAlert size={17}/><span>{dataError}</span></div>}
@@ -384,9 +461,10 @@ export default function AdminPanel({ user, onLogout }) {
             <div className="np-admin-data-toolbar"><div className="np-admin-data-title"><span className="np-admin-stat-icon"><ActiveIcon size={19}/></span><div><h3>{section} management</h3><p>{descriptions[section]}</p></div></div>
               <label className="np-admin-search"><Search size={16}/><input value={query} onChange={e => setQuery(e.target.value)} placeholder={section === "Users" ? "Search by email or NovoPay ID" : "Search records"} /></label>
             </div>
+            {section === "Packages" && <div className="np-admin-package-summary"><span><b>{rows.filter(row=>row.status==="active" && row.package_type==="basic").length}</b> Active Basic Plans</span><span><b>{rows.filter(row=>row.status==="active" && row.package_type==="fd").length}</b> Active FD Plans</span><span><b>Simple daily return</b> Calculation Mode</span></div>}
             <div className="np-admin-table-head">{(tableColumns[section] || ["RECORD", "STATUS", "DETAILS"]).map(col => <span key={col}>{col}</span>)}</div>
             {dataError && <div className="np-admin-inline-error" role="status"><ShieldAlert size={17}/><span>{dataError}</span></div>}
-            {loadingData ? <div className="np-admin-empty np-admin-section-empty"><RefreshCw size={22}/><b>Loading NovoPay records…</b><p>Reading from the authenticated admin API.</p></div> : rows.length ? <div className="np-admin-record-list">{rows.map((row, index) => <div className={`np-admin-record-row ${rowActions(row).length ? "has-actions" : ""}`} key={row.id || row.reference || index}>{recordCells(section, row).map((cell, cellIndex) => <span key={cellIndex} title={String(cell ?? "")}>{cell == null || cell === "" ? "—" : String(cell)}</span>)}{rowActions(row).length > 0 && <div className="np-admin-row-actions">{rowActions(row).map(([action, label, kind]) => <button key={action + label} className={`np-admin-action-button ${kind}`} disabled={!!actionBusy} onClick={() => runAdminAction(action, row, label)}>{actionBusy === action + ":" + (row.reference || row.id || row.novopay_id || "") ? "Working…" : label}</button>)}</div>}</div>)}</div> : <div className="np-admin-empty np-admin-section-empty"><span className="np-admin-empty-icon"><ActiveIcon size={22}/></span><b>{dataError ? "Records unavailable" : emptyTitles[section] || "No records available"}</b><p>{dataError ? "Resolve the backend configuration or admin permission message above, then refresh." : query ? "No records matched this search." : "No records exist in this section yet. No sample financial records are invented."}</p></div>}
+            {loadingData ? <div className="np-admin-empty np-admin-section-empty"><RefreshCw size={22}/><b>Loading NovoPay records…</b><p>Reading from the authenticated admin API.</p></div> : rows.length ? <div className="np-admin-record-list">{rows.map((row, index) => <div className={`np-admin-record-row ${rowActions(row).length ? "has-actions" : ""}`} key={row.id || row.reference || index}>{recordCells(section, row).map((cell, cellIndex) => <span key={cellIndex} title={String(cell ?? "")}>{cell == null || cell === "" ? "—" : String(cell)}</span>)}{section === "Packages" && <button className="np-admin-action-button" disabled={!!actionBusy} onClick={()=>startEditPackage(row)}><Pencil size={14}/> Edit</button>}{rowActions(row).length > 0 && <div className="np-admin-row-actions">{rowActions(row).map(([action, label, kind]) => <button key={action + label} className={`np-admin-action-button ${kind}`} disabled={!!actionBusy} onClick={() => runAdminAction(action, row, label)}>{actionBusy === action + ":" + (row.reference || row.id || row.novopay_id || "") ? "Working…" : label}</button>)}</div>}</div>)}</div> : <div className="np-admin-empty np-admin-section-empty"><span className="np-admin-empty-icon"><ActiveIcon size={22}/></span><b>{dataError ? "Records unavailable" : emptyTitles[section] || "No records available"}</b><p>{dataError ? "Resolve the backend configuration or admin permission message above, then refresh." : query ? "No records matched this search." : "No records exist in this section yet. No sample financial records are invented."}</p></div>}
           </section>}
           <footer className="np-admin-footer"><span>© {new Date().getFullYear()} NovoPay Finance</span><span><ShieldCheck size={14}/> Independent admin workspace</span>{lastRefresh && <span>Refresh requested at {lastRefresh}</span>}</footer>
         </div>
