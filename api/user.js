@@ -139,9 +139,45 @@ export default async function handler(req, res) {
       await db`ALTER TABLE users ADD COLUMN IF NOT EXISTS mobile text`;
       await db`ALTER TABLE users ADD COLUMN IF NOT EXISTS referral_code text`;
       await db`ALTER TABLE users ADD COLUMN IF NOT EXISTS sponsor_user_id text`;
-      await db`CREATE UNIQUE INDEX IF NOT EXISTS users_mobile_unique_idx ON users ((regexp_replace(mobile, '[^0-9]', '', 'g'))) WHERE mobile IS NOT NULL AND mobile <> ''`;
-      await db`CREATE UNIQUE INDEX IF NOT EXISTS users_referral_code_unique_idx ON users (upper(referral_code)) WHERE referral_code IS NOT NULL AND referral_code <> ''`;
-      const duplicateMobile = await db`SELECT novopay_id FROM users WHERE regexp_replace(COALESCE(mobile, ''), '[^0-9]', '', 'g') = ${normalizedMobile} LIMIT 1`;
+      // Registration must be safe to retry if Firebase created the account but the
+      // browser lost the profile response. Never treat the same auth user as a duplicate.
+      const existingProfile = await db`SELECT id, auth_uid, novopay_id, full_name, email, mobile, status, fund_balance, income_balance, referral_code, sponsor_user_id, created_at FROM users WHERE auth_uid = ${decoded.uid} LIMIT 1`;
+      if (existingProfile[0]) {
+        if (!existingProfile[0].mobile) {
+          const duplicateMobile = await db`SELECT novopay_id FROM users
+            WHERE auth_uid <> ${decoded.uid}
+              AND CASE
+                WHEN length(regexp_replace(COALESCE(mobile, ''), '[^0-9]', '', 'g')) = 12
+                  AND left(regexp_replace(COALESCE(mobile, ''), '[^0-9]', '', 'g'), 2) = '91'
+                  THEN substring(regexp_replace(COALESCE(mobile, ''), '[^0-9]', '', 'g') from 3)
+                WHEN length(regexp_replace(COALESCE(mobile, ''), '[^0-9]', '', 'g')) = 11
+                  AND left(regexp_replace(COALESCE(mobile, ''), '[^0-9]', '', 'g'), 1) = '0'
+                  THEN substring(regexp_replace(COALESCE(mobile, ''), '[^0-9]', '', 'g') from 2)
+                ELSE regexp_replace(COALESCE(mobile, ''), '[^0-9]', '', 'g')
+              END = ${normalizedMobile}
+            LIMIT 1`;
+          if (duplicateMobile[0]) return res.status(409).json({ error: "This mobile number is already registered. Please sign in to your existing account." });
+          const updated = await db`UPDATE users SET mobile = ${normalizedMobile}, updated_at = now()
+            WHERE auth_uid = ${decoded.uid} AND (mobile IS NULL OR mobile = '')
+            RETURNING id, auth_uid, novopay_id, full_name, email, mobile, status, fund_balance, income_balance, referral_code, sponsor_user_id, created_at`;
+          return res.status(200).json({ ok: true, user: updated[0] || existingProfile[0] });
+        }
+        return res.status(200).json({ ok: true, user: existingProfile[0] });
+      }
+      // Canonicalize existing formats when checking duplicates (10 digits, 0-prefix,
+      // and +91-prefix all refer to the same Indian mobile number). Keep this check
+      // in the request path read-only; index creation here can fail for legacy data.
+      const duplicateMobile = await db`SELECT novopay_id FROM users
+        WHERE CASE
+          WHEN length(regexp_replace(COALESCE(mobile, ''), '[^0-9]', '', 'g')) = 12
+            AND left(regexp_replace(COALESCE(mobile, ''), '[^0-9]', '', 'g'), 2) = '91'
+            THEN substring(regexp_replace(COALESCE(mobile, ''), '[^0-9]', '', 'g') from 3)
+          WHEN length(regexp_replace(COALESCE(mobile, ''), '[^0-9]', '', 'g')) = 11
+            AND left(regexp_replace(COALESCE(mobile, ''), '[^0-9]', '', 'g'), 1) = '0'
+            THEN substring(regexp_replace(COALESCE(mobile, ''), '[^0-9]', '', 'g') from 2)
+          ELSE regexp_replace(COALESCE(mobile, ''), '[^0-9]', '', 'g')
+        END = ${normalizedMobile}
+        LIMIT 1`;
       if (duplicateMobile[0]) return res.status(409).json({ error: "This mobile number is already registered. Please sign in to your existing account." });
       const sponsorRows = sponsorCode === "NA00501" ? [{ novopay_id: "NA00501" }] : await db`SELECT novopay_id FROM users WHERE status = 'active' AND (upper(COALESCE(referral_code, '')) = ${sponsorCode} OR upper(novopay_id) = ${sponsorCode}) LIMIT 1`;
       if (!sponsorRows[0]) return res.status(400).json({ error: "Referral ID is invalid or inactive. Check the ID and try again." });
