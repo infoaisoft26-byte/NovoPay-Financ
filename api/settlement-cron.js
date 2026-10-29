@@ -97,13 +97,88 @@ export default async function handler(req, res) {
         WHERE credit_amount > 0
         ON CONFLICT (idempotency_key) DO NOTHING
         RETURNING user_id, amount, reference, type, idempotency_key
+      ), sponsor_chain(source_user_id, source_ref, basis_amount, level, sponsor_id, next_sponsor_id) AS (
+        SELECT credited.user_id, credited.reference, credited.amount, 1,
+               sponsor.novopay_id, sponsor.sponsor_user_id
+        FROM credited
+        JOIN users downline ON downline.novopay_id = credited.user_id
+        JOIN users sponsor ON sponsor.novopay_id = downline.sponsor_user_id
+          AND lower(sponsor.status) = 'active'
+        UNION ALL
+        SELECT chain.source_user_id, chain.source_ref, chain.basis_amount, chain.level + 1,
+               sponsor.novopay_id, sponsor.sponsor_user_id
+        FROM sponsor_chain chain
+        JOIN users sponsor ON sponsor.novopay_id = chain.next_sponsor_id
+          AND lower(sponsor.status) = 'active'
+        WHERE chain.level < 15 AND chain.next_sponsor_id IS NOT NULL
+      ), sponsor_caps AS (
+        SELECT u.novopay_id AS user_id,
+          GREATEST(0, COALESCE(SUM(a.amount),0)::numeric * 5 -
+            COALESCE((
+              SELECT SUM(l.amount) FROM ledger_transactions l
+              WHERE l.user_id=u.novopay_id AND l.amount>0
+                AND lower(l.status) IN ('posted','completed','approved','paid')
+                AND (lower(l.type) LIKE '%income%' OR lower(l.type) LIKE '%roi%'
+                  OR lower(l.type) LIKE '%level%' OR lower(l.type) LIKE '%joining%'
+                  OR lower(l.type) LIKE '%retopup%' OR lower(l.type) LIKE '%bonus%'
+                  OR lower(l.type) LIKE '%principal_return%')
+            ),0)
+            - COALESCE((SELECT SUM(c2.amount) FROM credited c2 WHERE c2.user_id=u.novopay_id),0)
+          ) AS cap_remaining,
+          EXISTS (
+            SELECT 1 FROM package_activations active_a
+            WHERE active_a.user_id=u.novopay_id AND lower(active_a.status)='active'
+          ) AS has_active_package
+        FROM users u
+        LEFT JOIN package_activations a ON a.user_id=u.novopay_id
+          AND lower(a.status) IN ('active','completed','approved')
+        GROUP BY u.novopay_id
+      ), level_raw AS (
+        SELECT chain.*, caps.cap_remaining,
+          round(chain.basis_amount * CASE WHEN chain.level=1 THEN 0.05 ELSE 0.01 END, 8) AS proposed_amount
+        FROM sponsor_chain chain
+        JOIN sponsor_caps caps ON caps.user_id=chain.sponsor_id
+        WHERE caps.has_active_package
+          AND NOT EXISTS (
+            SELECT 1 FROM ledger_transactions existing
+            WHERE existing.idempotency_key =
+              'roi-level:' || chain.source_ref || ':L' || chain.level::text
+          )
+      ), level_ranked AS (
+        SELECT level_raw.*,
+          SUM(proposed_amount) OVER (
+            PARTITION BY sponsor_id ORDER BY source_ref, level
+            ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+          ) AS cumulative_commission
+        FROM level_raw
+      ), level_bounded AS (
+        SELECT level_ranked.*,
+          LEAST(proposed_amount, GREATEST(0, cap_remaining -
+            (cumulative_commission - proposed_amount))) AS credit_amount
+        FROM level_ranked
+      ), level_credited AS (
+        INSERT INTO ledger_transactions
+          (reference,user_id,type,amount,currency,status,description,idempotency_key)
+        SELECT 'RLI' || md5(source_ref || ':L' || level::text),
+          sponsor_id,'roi_level_income',credit_amount,'USDT','posted',
+          'Level ' || level::text || ' ROI income from ' || source_user_id ||
+            ' daily ROI (' || source_ref || ')',
+          'roi-level:' || source_ref || ':L' || level::text
+        FROM level_bounded
+        WHERE credit_amount > 0
+        ON CONFLICT (idempotency_key) DO NOTHING
+        RETURNING user_id,amount,reference,type,idempotency_key
       ), balance_updates AS (
         UPDATE users u
         SET income_balance = u.income_balance + totals.amount,
             updated_at = now()
         FROM (
           SELECT user_id, SUM(amount)::numeric AS amount
-          FROM credited
+          FROM (
+            SELECT user_id, amount FROM credited
+            UNION ALL
+            SELECT user_id, amount FROM level_credited
+          ) credits
           GROUP BY user_id
         ) totals
         WHERE u.novopay_id = totals.user_id
