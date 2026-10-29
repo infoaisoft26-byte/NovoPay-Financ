@@ -231,16 +231,45 @@ export default function UserDashboard({ user, onLogout }) {
                 <div><span className="np-user-welcome-icon"><Wallet size={21} /></span><p>ACCOUNT STATUS</p><h2>{profile?.status ? profile.status[0].toUpperCase() + profile.status.slice(1) : loading ? "Loading…" : "Profile pending"}</h2><small>{profile?.novopay_id ? `NovoPay ID: ${profile.novopay_id}` : "Your account details will appear after profile setup."}</small></div>
                 <div className="np-user-welcome-right"><ShieldCheck size={28} /><span>Private member area</span><small>Only your authenticated account data</small></div>
               </div>
-              <div className="np-user-stats">
-                <Stat icon={Wallet} label="Fund Wallet" value={profile ? money(profile.fund_balance) : "—"} tone="blue" />
-                <Stat icon={Activity} label="Income Wallet" value={profile ? money(profile.income_balance) : "—"} tone="green" />
-                <Stat icon={ArrowDownLeft} label="Pending Deposits" value={data?.summary ? String(data.summary.pendingDeposits) : "—"} tone="violet" />
-                <Stat icon={Clock3} label="Pending Withdrawals" value={data?.summary ? String(data.summary.pendingWithdrawals) : "—"} tone="amber" />
-                <Stat icon={Package} label="Active Packages" value={data?.summary ? String(data.summary.activePackages ?? 0) : "—"} tone="green" />
+              <div className="np-user-action-shortcuts">
+                <Quick icon={ArrowDownLeft} label="Recharge Fund" onClick={() => chooseSection("deposits")} />
+                <Quick icon={Package} label="Basic Package" onClick={() => chooseSection("basic-package")} />
+                <Quick icon={ArrowLeftRight} label="P2P Transfer" onClick={() => chooseSection("p2p")} />
+                <Quick icon={ArrowUpRight} label="Withdraw" onClick={() => chooseSection("withdrawals")} />
               </div>
+              <div className="np-user-package-overview">
+                {(data?.packages || []).filter(p => String(p.package_type || p.name || '').toLowerCase().includes('basic')).slice(0,1).map(p => <PackageSummary key={p.id} title="Basic Package" row={p} onActivate={() => chooseSection("basic-package")} />)}
+                {(data?.packages || []).filter(p => { const k=String(p.package_type || p.name || '').toLowerCase(); return k === 'fd' || k.includes('fixed deposit') || k.startsWith('fd '); }).slice(0,1).map(p => <PackageSummary key={p.id} title="FD Package" row={p} onActivate={() => chooseSection("fd-package")} />)}
+                {!(data?.packages || []).some(p => String(p.package_type || p.name || '').toLowerCase().includes('basic')) && <PackageSummary title="Basic Package" row={null} onActivate={() => chooseSection("basic-package")} />}
+                {!(data?.packages || []).some(p => { const k=String(p.package_type || p.name || '').toLowerCase(); return k === 'fd' || k.includes('fixed deposit') || k.startsWith('fd '); }) && <PackageSummary title="FD Package" row={null} onActivate={() => chooseSection("fd-package")} />}
+              </div>
+              <section className="np-user-cap-card">
+                <div className="np-user-cap-head"><div><span className="np-user-eyebrow">LIVE 5X CAPPING</span><h2>Investment cap overview</h2><p>Calculated from recorded package activations and eligible posted income.</p></div><span className="np-user-status good">{profile?.status || "Active"}</span></div>
+                <div className="np-user-cap-stats">
+                  <CapValue label="Recorded investment" value={money(data?.capping?.recordedInvestment ?? 0)} />
+                  <CapValue label="Total 5X cap" value={money(data?.capping?.totalCap ?? 0)} />
+                  <CapValue label="Counted income" value={money(data?.capping?.countedIncome ?? 0)} />
+                  <CapValue label="Remaining cap" value={money(data?.capping?.remainingCap ?? 0)} />
+                </div>
+              </section>
+              <section className="np-user-panel np-user-referral-overview">
+                <PanelTitle title="Your Referral Link" subtitle="Share your NovoPay referral link with new members." />
+                <div className="np-user-referral-code">{profile?.referral_code || profile?.novopay_id || "Loading…"}</div>
+                <div className="np-user-referral-link">{typeof window !== "undefined" && profile ? window.location.origin + "/register?ref=" + encodeURIComponent(profile.referral_code || profile.novopay_id) : "Your referral link will appear here."}</div>
+                <div className="np-user-referral-meta"><span><small>Referral ID</small><b>{profile?.referral_code || profile?.novopay_id || "—"}</b></span><span><small>Sponsor ID</small><b>{profile?.sponsor_user_id || "—"}</b></span><span><small>Sponsor Name</small><b>{data?.sponsor?.full_name || "—"}</b></span><span><small>Primary Mobile</small><b>{profile?.mobile || profile?.phone || "—"}</b></span></div>
+                <div className="np-user-referral-buttons"><button className="np-user-referral-copy" onClick={async () => { try { await navigator.clipboard.writeText(window.location.origin + "/register?ref=" + encodeURIComponent(profile?.referral_code || profile?.novopay_id || "")); setActionMessage("Referral URL copied."); } catch { setActionMessage("Select and copy the referral URL."); } }}>Copy Referral URL</button><button className="np-user-referral-copy secondary" onClick={async () => { try { await navigator.clipboard.writeText(profile?.referral_code || profile?.novopay_id || ""); setActionMessage("Referral ID copied."); } catch { setActionMessage("Select and copy the referral ID."); } }}>Copy ID</button></div>
+                {actionMessage && <p role="status">{actionMessage}</p>}
+              </section>
+              <section className="np-user-panel np-user-level-income">
+                <PanelTitle title="Level-wise Income Details" subtitle="Actual credited amounts from your income ledger. Levels with no matching credited entry show 0.00." />
+                <LevelIncome title="ROI Level Income" rate="L1 5% · L2–L12 1% · L13–L15 0.5%" values={data?.levelIncome?.roi || {}} />
+                <LevelIncome title="Joining / First Deposit Level Income" rate="L1 5% · L2–L15 0.25%" values={data?.levelIncome?.joining || {}} />
+                <LevelIncome title="Retopup Income" rate="L1 1% · L2–L15 0.25%" values={data?.levelIncome?.retopup || {}} />
+                <p className="np-user-income-note">Rates show the configured schedule, not a guaranteed return. Credits appear here only after they are recorded in the ledger.</p>
+              </section>
               <div className="np-user-grid-two">
                 <section className="np-user-panel"><PanelTitle title="Recent transactions" subtitle="Latest ledger activity" action="View all" onAction={() => chooseSection("transactions")} /><Records rows={(data?.recentTransactions || []).slice(0, 5)} type="transactions" loading={loading} /></section>
-                <section className="np-user-panel"><PanelTitle title="Quick actions" subtitle="Account shortcuts" /><div className="np-user-quick-grid"><Quick icon={ArrowDownLeft} label="Deposit history" onClick={() => chooseSection("deposits")} /><Quick icon={ArrowUpRight} label="Withdrawal history" onClick={() => chooseSection("withdrawals")} /><Quick icon={Layers3} label="View packages" onClick={() => chooseSection("packages")} /><Quick icon={CircleHelp} label="Get support" onClick={() => chooseSection("support")} /></div><p className="np-user-safe-note">Requests are sent to NovoPay's authenticated API. Deposits require verification; withdrawals and package requests remain subject to the configured review rules.</p></section>
+                <section className="np-user-panel"><PanelTitle title="Quick actions" subtitle="Account shortcuts" /><div className="np-user-quick-grid"><Quick icon={ArrowDownLeft} label="Deposit history" onClick={() => chooseSection("deposits")} /><Quick icon={ArrowUpRight} label="Withdrawal history" onClick={() => chooseSection("withdrawals")} /><Quick icon={Layers3} label="View packages" onClick={() => chooseSection("packages")} /><Quick icon={CircleHelp} label="Get support" onClick={() => chooseSection("support")} /></div><p className="np-user-safe-note">Deposits require transaction verification; withdrawals and package activations remain subject to the configured review rules.</p></section>
               </div>
               <p className="np-user-updated">{lastUpdated ? `Last refreshed ${lastUpdated.toLocaleTimeString()}` : "Live records load from the secure NovoPay backend."}</p>
             </>
@@ -280,6 +309,14 @@ export default function UserDashboard({ user, onLogout }) {
   );
 }
 
+function PackageSummary({ title, row, onActivate }) {
+  return <article className="np-user-package-summary"><div><span className="np-user-eyebrow">{title}</span><h3>{row?.name || (title === "Basic Package" ? "Active Daily ROI Plan" : "Fixed Deposit Lock Plan")}</h3><strong>{money(row?.price ?? 0)}</strong><p>{row?.description || (row ? "Configured package" : "Package not configured yet")}</p></div><button onClick={onActivate}>Activate</button></article>;
+}
+function CapValue({ label, value }) { return <div className="np-user-cap-value"><small>{label}</small><b>{value}</b></div>; }
+function LevelIncome({ title, rate, values }) {
+  const total = Array.from({length:15},(_,i)=>Number(values?.[i+1] || 0)).reduce((a,b)=>a+b,0);
+  return <div className="np-user-income-group"><div className="np-user-income-group-head"><div><h3>{title}</h3><small>{rate}</small></div><div><small>Total credited</small><b>{money(total)}</b></div></div><div className="np-user-level-grid">{Array.from({length:15},(_,i)=>i+1).map(level => <div className="np-user-level-tile" key={level}><span>Level {level}</span><b>{money(values?.[level] || 0)}</b></div>)}</div></div>;
+}
 function Stat({ icon: Icon, label, value, tone }) {
   return <article className="np-user-stat"><span className={`np-user-stat-icon ${tone}`}><Icon size={20} /></span><div><p>{label}</p><strong>{value}</strong><small>Verified account data</small></div></article>;
 }
