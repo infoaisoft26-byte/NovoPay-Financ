@@ -153,7 +153,9 @@ export default function AdminPanel({ user, onLogout }) {
   }
 
   useEffect(() => {
-    const slug = sectionSlugs[section];
+    const normalizedSection = String(section || "").trim();
+    // Keep Settings explicitly mapped even if the selected label contains whitespace from the UI.
+    const slug = sectionSlugs[normalizedSection] || sectionSlugs[normalizedSection.replace(/\\s+/g, " ")] || (normalizedSection.toLowerCase() === "settings" ? "settings" : undefined);
     if (!slug) {
       setRows([]);
       setOverviewCounts(null);
