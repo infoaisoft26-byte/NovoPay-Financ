@@ -195,7 +195,15 @@ export default async function handler(req, res) {
         db`SELECT count(*)::int AS count FROM withdrawals WHERE user_id = ${profile.novopay_id} AND status = 'pending'`,
         db`SELECT count(*)::int AS count FROM package_activations WHERE user_id = ${profile.novopay_id} AND status = 'active'`,
         db`SELECT a.id, a.reference, a.amount, a.currency, a.status, a.activated_at, p.name AS package_name, to_jsonb(p)->>'package_type' AS package_type FROM package_activations a LEFT JOIN packages p ON p.id = a.package_id WHERE a.user_id = ${profile.novopay_id} ORDER BY a.created_at DESC`,
-        db`SELECT id, reference, type, amount, currency, status, description, created_at FROM ledger_transactions WHERE user_id = ${profile.novopay_id} AND (type ILIKE '%income%' OR type ILIKE '%roi%' OR type ILIKE '%level%' OR type ILIKE '%joining%' OR type ILIKE '%retopup%' OR description ILIKE '%income%' OR description ILIKE '%roi%' OR description ILIKE '%level%' OR description ILIKE '%joining%' OR description ILIKE '%retopup%') ORDER BY created_at DESC LIMIT 1000`,
+        db`SELECT id, reference, type, amount, currency, status, description, created_at FROM ledger_transactions WHERE user_id = ${profile.novopay_id} AND (
+          lower(type) IN ('roi_income','basic_roi_income','fd_roi_income','referral_income','basic_referral_income','fd_referral_income','level_income','basic_level_income','fd_level_income','joining_income','first_deposit_income','retopup_income','bonus_income','registration_bonus','principal_return','salary_income')
+          OR lower(type) LIKE '%income%' OR lower(type) LIKE '%roi%' OR lower(type) LIKE '%level%'
+          OR lower(type) LIKE '%joining%' OR lower(type) LIKE '%retopup%' OR lower(type) LIKE '%bonus%'
+          OR lower(type) LIKE '%principal_return%'
+          OR lower(description) LIKE '%income%' OR lower(description) LIKE '%roi%' OR lower(description) LIKE '%level%'
+          OR lower(description) LIKE '%joining%' OR lower(description) LIKE '%retopup%' OR lower(description) LIKE '%bonus%'
+          OR lower(description) LIKE '%principal return%'
+        ) ORDER BY created_at DESC LIMIT 1000`,
         db`SELECT novopay_id, full_name FROM users WHERE novopay_id = ${profile.sponsor_user_id} LIMIT 1`,
         queries.packages(db, profile.novopay_id, '%', 50),
       ]);
