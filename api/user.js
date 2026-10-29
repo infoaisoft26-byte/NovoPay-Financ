@@ -189,7 +189,7 @@ export default async function handler(req, res) {
     }
 
     if (section === "overview") {
-      const [recentTransactions, pendingDeposits, pendingWithdrawals, activePackages, activations, incomeLedger, sponsorRows, packageRows] = await Promise.all([
+      const [recentTransactions, pendingDeposits, pendingWithdrawals, activePackages, activations, incomeLedger, sponsorRows, packageRows, countedIncomeRows] = await Promise.all([
         db`SELECT id, reference, type, amount, currency, status, description, created_at FROM ledger_transactions WHERE user_id = ${profile.novopay_id} ORDER BY created_at DESC LIMIT 5`,
         db`SELECT count(*)::int AS count FROM deposits WHERE user_id = ${profile.novopay_id} AND status = 'pending'`,
         db`SELECT count(*)::int AS count FROM withdrawals WHERE user_id = ${profile.novopay_id} AND status = 'pending'`,
@@ -206,10 +206,14 @@ export default async function handler(req, res) {
         ) ORDER BY created_at DESC LIMIT 1000`,
         db`SELECT novopay_id, full_name FROM users WHERE novopay_id = ${profile.sponsor_user_id} LIMIT 1`,
         queries.packages(db, profile.novopay_id, '%', 50),
+        db`SELECT COALESCE(SUM(amount), 0)::numeric AS counted_income FROM ledger_transactions WHERE user_id = ${profile.novopay_id} AND amount > 0 AND lower(status) IN ('posted','completed','approved','paid') AND (
+          lower(type) LIKE '%income%' OR lower(type) LIKE '%roi%' OR lower(type) LIKE '%level%' OR lower(type) LIKE '%joining%' OR lower(type) LIKE '%retopup%' OR lower(type) LIKE '%bonus%' OR lower(type) LIKE '%principal_return%'
+          OR lower(description) LIKE '%income%' OR lower(description) LIKE '%roi%' OR lower(description) LIKE '%level%' OR lower(description) LIKE '%joining%' OR lower(description) LIKE '%retopup%' OR lower(description) LIKE '%bonus%' OR lower(description) LIKE '%principal return%'
+        )`,
       ]);
       const eligibleActivations = activations.filter(row => ['active','completed','approved'].includes(String(row.status || '').toLowerCase()));
       const recordedInvestment = eligibleActivations.reduce((sum,row)=>sum+Number(row.amount || 0),0);
-      const countedIncome = incomeLedger.filter(row => ['posted','completed','approved','paid'].includes(String(row.status || '').toLowerCase()) && Number(row.amount || 0) > 0).reduce((sum,row)=>sum+Number(row.amount || 0),0);
+      const countedIncome = Number(countedIncomeRows[0]?.counted_income || 0);
       const levelIncome = { roi: {}, joining: {}, retopup: {} };
       for (const row of incomeLedger) {
         const type = String(row.type || '').toLowerCase(), desc = String(row.description || '').toLowerCase(), label = type + ' ' + desc;
