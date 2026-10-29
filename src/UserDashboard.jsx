@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { EmailAuthProvider, reauthenticateWithCredential, updateEmail, updatePassword } from "firebase/auth";
 import { auth } from "./firebase.js";
 import {
@@ -110,6 +110,8 @@ export default function UserDashboard({ user, onLogout }) {
   const [lastUpdated, setLastUpdated] = useState(null);
   const [actionBusy, setActionBusy] = useState(false);
   const [actionMessage, setActionMessage] = useState("");
+  const [depositPopup, setDepositPopup] = useState(null);
+  const previousDepositStatuses = useRef(null);
   const [depositAmount, setDepositAmount] = useState("2");
   const [txHash, setTxHash] = useState("");
   const [withdrawAmount, setWithdrawAmount] = useState("");
@@ -164,6 +166,42 @@ export default function UserDashboard({ user, onLogout }) {
   }, [user, section, query]);
 
   useEffect(() => { load(); }, [load]);
+  useEffect(() => {
+    let cancelled = false;
+    const checkDepositUpdates = async () => {
+      try {
+        const token = await user.getIdToken();
+        const response = await fetch("/api/user?section=deposits&limit=50", {
+          headers: { Authorization: "Bearer " + token }, cache: "no-store"
+        });
+        if (!response.ok) return;
+        const payload = await response.json();
+        const deposits = Array.isArray(payload.rows) ? payload.rows : [];
+        if (cancelled) return;
+        const current = new Map(deposits.map(row => [row.reference, String(row.status || "").toLowerCase()]));
+        if (previousDepositStatuses.current) {
+          for (const row of deposits) {
+            const before = previousDepositStatuses.current.get(row.reference);
+            const after = String(row.status || "").toLowerCase();
+            if (before === "pending" && ["approved","completed","credited"].includes(after)) {
+              setDepositPopup({ type: "success", title: "Deposit Approved", message: money(row.amount) + " has been credited to your Fund Wallet." });
+              load();
+              break;
+            }
+            if (before === "pending" && after === "rejected") {
+              setDepositPopup({ type: "error", title: "Deposit Rejected", message: "Your deposit request was rejected. Please review your deposit history or contact support." });
+              load();
+              break;
+            }
+          }
+        }
+        previousDepositStatuses.current = current;
+      } catch { /* Temporary polling errors should not interrupt the dashboard. */ }
+    };
+    checkDepositUpdates();
+    const timer = window.setInterval(checkDepositUpdates, 5000);
+    return () => { cancelled = true; window.clearInterval(timer); };
+  }, [user, load]);
   useEffect(() => { setProfileMobile(data?.user?.mobile || ""); }, [data?.user?.mobile]);
   useEffect(() => {
     const timer = window.setInterval(() => load(), 15000);
@@ -268,6 +306,13 @@ export default function UserDashboard({ user, onLogout }) {
 
   return (
     <main className="np-user-shell">
+      {depositPopup && <div role="dialog" aria-live="assertive" aria-modal="true" style={{position:"fixed",inset:0,zIndex:9999,background:"rgba(4,8,18,.72)",display:"grid",placeItems:"center",padding:20}}>
+        <section style={{width:"min(420px,100%)",background:"#101827",color:"#fff",border:"1px solid #b99750",borderRadius:20,padding:28,textAlign:"center",boxShadow:"0 24px 80px rgba(0,0,0,.45)"}}>
+          <div style={{width:54,height:54,borderRadius:99,margin:"0 auto 14px",display:"grid",placeItems:"center",fontSize:28,fontWeight:800,background:depositPopup.type==="success"?"#164e3a":"#5b2028",color:depositPopup.type==="success"?"#86efac":"#fca5a5"}}>{depositPopup.type==="success"?"✓":"!"}</div>
+          <h2 style={{margin:"0 0 10px"}}>{depositPopup.title}</h2><p style={{lineHeight:1.6,color:"#d1d5db"}}>{depositPopup.message}</p>
+          <button type="button" onClick={()=>setDepositPopup(null)} style={{marginTop:12,border:0,borderRadius:10,padding:"11px 28px",background:"#d4af62",color:"#111827",fontWeight:800,cursor:"pointer"}}>Okay</button>
+        </section>
+      </div>
       <aside className={`np-user-sidebar ${mobileOpen ? "open" : ""}`}>
         <div className="np-user-brand-row">
           <span className="np-user-brand"><img className="np-sidebar-logo" src="/novopay-logo.svg" alt="NovoPay Finance" /><small>MEMBER PORTAL</small></span>
