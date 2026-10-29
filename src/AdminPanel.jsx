@@ -22,6 +22,7 @@ const navGroups = [
     { label: "Packages", navLabel: "Package Management", icon: Package },
     { label: "Package Activations", icon: PackageCheck },
     { label: "Reports", icon: ChartNoAxesCombined },
+    { label: "Income Reports", icon: Activity },
     { label: "Income Leaderboard", icon: Trophy },
   ]},
   { title: "OPERATIONS & SECURITY", items: [
@@ -46,6 +47,7 @@ const descriptions = {
   "Package Activations": "Review package purchases and activation history.",
   Reports: "Review platform, transaction and finance summaries.",
   "Income Leaderboard": "Rank eligible accounts using verified NovoPay records.",
+  "Income Reports": "Platform-wide income and ledger report across all members, categories and statuses.",
   "Support Tickets": "Manage customer questions and support status.",
   "Website Feedback": "Review submitted product feedback.",
   "Survey Responses": "Review user survey submissions.",
@@ -78,7 +80,7 @@ const sectionSlugs = {
   Withdrawals: "withdrawals", Transactions: "transactions", "P2P Transfers": "p2p",
   Packages: "packages", "Package Activations": "activations", "Support Tickets": "support",
   "Website Feedback": "feedback", "Survey Responses": "surveys", "Audit Logs": "audit", "Offer Posters": "posters",
-  Reports: "reports", "Income Leaderboard": "leaderboard", Settings: "settings",
+  Reports: "reports", "Income Reports": "income-reports", "Income Leaderboard": "leaderboard", Settings: "settings",
 };
 
 function recordCells(section, row) {
@@ -98,6 +100,7 @@ function recordCells(section, row) {
     case "Audit Logs": return [row.id, row.actor_uid, row.action + " · " + (row.entity_type || "") + " · " + (row.entity_id || "")];
     case "Offer Posters": return [row.title, row.status, row.image_url];
     case "Reports": return [row.name, row.status, row.details];
+    case "Income Reports": return [(row.user_id || "—") + " · " + (row.full_name || "Member"), row.income_category || row.type, (row.reference || row.id || "—") + " · " + amount(row.amount, row.currency) + " · " + row.status + " · " + (row.created_at || "")];
     case "Income Leaderboard": return [row.novopay_id + " · " + (row.full_name || ""), String(row.total_investment || "0") + " USDT", "Sponsor: " + (row.sponsor_user_id || "—") + " · Direct: " + row.direct_members];
     case "Settings": return [row.name, row.status, row.details];
     default: return [row.id || "—", row.status || "—", "—"];
@@ -114,6 +117,7 @@ const tableColumns = {
   Packages: ["PACKAGE", "STATUS", "PRICE / RULES"],
   "Package Activations": ["ACTIVATION REF", "STATUS", "USER / PACKAGE"],
   Reports: ["REPORT", "DATA STATUS", "LAST UPDATED"],
+  "Income Reports": ["MEMBER / NP ID", "INCOME CATEGORY", "LEDGER / AMOUNT / STATUS"],
   "Income Leaderboard": ["RANK / USER ID", "VERIFIED TOTAL", "LEVEL DETAILS"],
   "Support Tickets": ["TICKET REF", "STATUS", "USER / SUBJECT"],
   "Website Feedback": ["FEEDBACK REF", "STATUS", "SUBMISSION"],
