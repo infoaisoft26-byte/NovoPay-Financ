@@ -177,7 +177,7 @@ export default function App() {
       <main className="np-dashboard">
         <header className="np-dash-header">
           <a className="np-brand" href="/" onClick={(e) => { e.preventDefault(); navigate(isAdmin ? "/admin" : "/dashboard"); }}>
-            <span className="np-brand-mark"><WalletCards size={21} /></span><span>NovoPay <b>Finance</b></span>
+            <img className="np-logo-image" src="/novopay-logo.svg" alt="NovoPay Finance" />
           </a>
           <button className="np-outline-button" onClick={handleLogout}>Logout</button>
         </header>
@@ -208,7 +208,7 @@ function AuthScreen({ mode, setMode, name, setName, mobile, setMobile, sponsorCo
       <section className="np-auth-layout">
         <div className="np-auth-intro">
           <a className="np-brand" href="/" onClick={(e) => { e.preventDefault(); navigate("/"); }}>
-            <span className="np-brand-mark"><WalletCards size={23} /></span><span>NovoPay <b>Finance</b></span>
+            <img className="np-logo-image" src="/novopay-logo.svg" alt="NovoPay Finance" />
           </a>
           <div className="np-intro-copy">
             <span className="np-kicker"><span className="np-live-dot" /> WELCOME TO NOVOPAY FINANCE</span>
