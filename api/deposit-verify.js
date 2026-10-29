@@ -59,11 +59,12 @@ export default async function handler(req, res) {
     if (!deposit || deposit.user_id !== profile.novopay_id) fail("No deposit request was found for this transaction. Submit the deposit request first.", 404);
     if (["approved", "completed", "credited"].includes(String(deposit.status).toLowerCase())) return res.status(200).json({ ok: true, status: "approved", message: "This deposit has already been credited.", reference: deposit.reference });
     if (String(deposit.status).toLowerCase() !== "pending") fail("This deposit is not pending verification.", 409);
+    if (String(deposit.currency || "").toUpperCase() !== "USDT") fail("Only USDT deposits can be verified here.", 409);
     if (depositRows.length > 1) fail("This transaction hash is linked to multiple requests. Contact support; no additional credit was made.", 409);
 
     const platformRows = await sql`SELECT setting_value FROM system_settings WHERE setting_key='platform' LIMIT 1`;
     const settings = platformRows[0]?.setting_value || {};
-    const receivingAddress = String(settings.depositAddress || process.env.NOVOPAY_BEP20_DEPOSIT_ADDRESS || "").trim().toLowerCase();
+    const receivingAddress = String(settings.depositAddress || process.env.NOVOPAY_BEP20_DEPOSIT_ADDRESS || "0xBF2bfe77a6Fc846cF9881A5A93508c7D5d6658b3").trim().toLowerCase();
     if (!/^0x[a-f0-9]{40}$/.test(receivingAddress)) fail("The NovoPay receiving address has not been configured by the administrator.", 503);
 
     let receipt;
@@ -90,6 +91,7 @@ export default async function handler(req, res) {
       UPDATE deposits SET status='approved', reviewed_at=now()
       WHERE reference=${deposit.reference} AND user_id=${profile.novopay_id} AND status='pending'
         AND lower(tx_hash)=${txHash}
+        AND NOT EXISTS (SELECT 1 FROM ledger_transactions WHERE reference = 'NP-DEP-'||deposits.reference OR idempotency_key = 'deposit-credit:'||deposits.reference)
       RETURNING reference,user_id,amount,currency,tx_hash
     ), balance AS (
       UPDATE users u SET fund_balance=u.fund_balance+c.amount, updated_at=now()
