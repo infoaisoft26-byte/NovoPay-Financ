@@ -187,6 +187,14 @@ export default function AdminPanel({ user, onLogout }) {
         if (section === "Overview") {
           setOverviewCounts(payload.counts || null);
           setRecentActivity(Array.isArray(payload.recentActivity) ? payload.recentActivity : []);
+        } else if (section === "Settings") {
+          if (payload.settings && typeof payload.settings === "object") {
+            setPlatformSettings(current => ({ ...current, ...payload.settings,
+              commissions: Array.isArray(payload.settings.commissions) && payload.settings.commissions.length === 15
+                ? payload.settings.commissions.map(Number) : current.commissions
+            }));
+          }
+          setRows([]);
         } else setRows(Array.isArray(payload.rows) ? payload.rows : []);
       } catch (error) {
         if (!cancelled) { setRows([]); setOverviewCounts(null); setRecentActivity([]); setDataError(error.message || "Admin data could not be loaded."); }
@@ -259,8 +267,12 @@ export default function AdminPanel({ user, onLogout }) {
       });
       const payload = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(payload.error || "Settings could not be saved.");
-      setPlatformSettings(current => ({ ...current, ...(payload.settings || {}) }));
-      setNotice("All NovoPay system settings saved. Commission changes apply to future settlements only.");
+      if (!payload.settings) throw new Error("The server did not confirm the saved settings. Refresh and verify before relying on the change.");
+      setPlatformSettings(current => ({ ...current, ...payload.settings,
+        commissions: Array.isArray(payload.settings.commissions) && payload.settings.commissions.length === 15
+          ? payload.settings.commissions.map(Number) : current.commissions
+      }));
+      setNotice("Settings saved and reloaded from the NovoPay database. Commission changes apply to future settlements only.");
       setReloadKey(value => value + 1);
     } catch (error) { setDataError(error.message || "Settings could not be saved."); }
     finally { setActionBusy(""); }
