@@ -197,7 +197,7 @@ export default async function handler(req, res) {
       const pkg = packages[0];
       if (!pkg || pkg.status !== "active") fail("This package is not currently available.", 409);
       const purchaseRef = reference;
-      const activation = await sql`WITH debited AS (
+      const activation = await sql`WITH RECURSIVE debited AS (
         UPDATE users SET fund_balance = fund_balance - ${pkg.price}::numeric, updated_at = now()
         WHERE novopay_id = ${profile.novopay_id} AND fund_balance >= ${pkg.price}::numeric
         RETURNING novopay_id
@@ -205,23 +205,40 @@ export default async function handler(req, res) {
         INSERT INTO package_activations (reference, user_id, package_id, amount, currency, status, activated_at)
         SELECT ${purchaseRef}, novopay_id, ${pkg.id}::uuid, ${pkg.price}, ${pkg.currency}, 'active', now() FROM debited
         RETURNING reference, user_id, package_id, amount, currency, status, activated_at
-      ), commission AS (
-        INSERT INTO referral_commissions (reference, sponsor_user_id, referred_user_id, package_activation_ref, basis_amount, rate, amount, currency, status)
-        SELECT ${"RC" + purchaseRef}, sponsor.novopay_id, created.user_id, created.reference, created.amount, 0.07, round(created.amount * 0.07, 8), created.currency, 'posted'
+      ), sponsor_chain(level, sponsor_id, next_sponsor_id) AS (
+        SELECT 1, sponsor.novopay_id, sponsor.sponsor_user_id
         FROM created
         JOIN users referred ON referred.novopay_id = created.user_id
         JOIN users sponsor ON sponsor.novopay_id = referred.sponsor_user_id AND sponsor.status = 'active'
         WHERE referred.sponsor_user_id IS NOT NULL
-        ON CONFLICT (package_activation_ref) DO NOTHING
-        RETURNING reference, sponsor_user_id, referred_user_id, package_activation_ref, amount, currency
+        UNION ALL
+        SELECT chain.level + 1, sponsor.novopay_id, sponsor.sponsor_user_id
+        FROM sponsor_chain chain
+        JOIN users sponsor ON sponsor.novopay_id = chain.next_sponsor_id AND sponsor.status = 'active'
+        WHERE chain.level < 15 AND chain.next_sponsor_id IS NOT NULL
+      ), commission AS (
+        INSERT INTO referral_commissions (reference, sponsor_user_id, referred_user_id, package_activation_ref, basis_amount, rate, amount, currency, status, level)
+        SELECT ${"RC" + purchaseRef + "L"} || chain.level::text,
+               chain.sponsor_id, created.user_id, created.reference, created.amount,
+               CASE WHEN chain.level = 1 THEN 0.07 ELSE 0.01 END,
+               round(created.amount * CASE WHEN chain.level = 1 THEN 0.07 ELSE 0.01 END, 8),
+               created.currency, 'posted', chain.level
+        FROM created CROSS JOIN sponsor_chain chain
+        ON CONFLICT (package_activation_ref, level) DO NOTHING
+        RETURNING reference, sponsor_user_id, referred_user_id, package_activation_ref, amount, currency, level
       ), sponsor_credit AS (
         UPDATE users sponsor SET income_balance = sponsor.income_balance + commission.amount, updated_at = now()
         FROM commission
         WHERE sponsor.novopay_id = commission.sponsor_user_id
-        RETURNING sponsor.novopay_id, commission.reference, commission.referred_user_id, commission.package_activation_ref, commission.amount, commission.currency
+        RETURNING sponsor.novopay_id, commission.reference, commission.referred_user_id, commission.package_activation_ref, commission.amount, commission.currency, commission.level
       ), referral_ledger AS (
         INSERT INTO ledger_transactions (reference, user_id, type, amount, currency, status, description, idempotency_key)
-        SELECT ${"RL" + purchaseRef}, sponsor_credit.novopay_id, 'referral_income', sponsor_credit.amount, sponsor_credit.currency, 'posted', ${"Direct referral reward (7%) for package activation " + purchaseRef}, ${"referral:" + purchaseRef}
+        SELECT ${"RL" + purchaseRef + "L"} || sponsor_credit.level::text,
+               sponsor_credit.novopay_id,
+               CASE WHEN sponsor_credit.level = 1 THEN 'referral_income' ELSE 'level_income' END,
+               sponsor_credit.amount, sponsor_credit.currency, 'posted',
+               CASE WHEN sponsor_credit.level = 1 THEN 'Level 1 direct referral income (7%) for package activation ' ELSE 'Level ' || sponsor_credit.level::text || ' income (1%) for package activation ' END || ${purchaseRef},
+               ${"referral:" + purchaseRef + ":L"} || sponsor_credit.level::text
         FROM sponsor_credit
         ON CONFLICT (idempotency_key) DO NOTHING
         RETURNING id
@@ -231,11 +248,12 @@ export default async function handler(req, res) {
         RETURNING id
       ), audited AS (
         INSERT INTO audit_logs (actor_uid, action, entity_type, entity_id, details)
-        SELECT ${decoded.uid}, 'package_purchased', 'package_activation', reference, jsonb_build_object('package_id', package_id::text, 'amount', amount) FROM created
+        SELECT ${decoded.uid}, 'package_purchased', 'package_activation', reference, jsonb_build_object('package_id', package_id::text, 'amount', amount, 'level_commissions', (SELECT count(*) FROM commission)) FROM created
         RETURNING id
       )
       SELECT created.reference, created.amount, created.status, created.activated_at,
-             COALESCE((SELECT sum(amount) FROM commission), 0) AS referral_reward
+             COALESCE((SELECT sum(amount) FROM commission), 0) AS referral_reward,
+             COALESCE((SELECT count(*) FROM commission), 0) AS levels_credited
       FROM created CROSS JOIN (SELECT count(*) FROM ledger) ledger_guard CROSS JOIN (SELECT count(*) FROM audited) audit_guard`;
       if (!activation.length) fail("Insufficient Fund Wallet balance. Deposit and verify funds first.", 409);
       return res.status(201).json({ ok: true, message: "Package activated.", record: activation[0] });
