@@ -114,6 +114,25 @@ export default async function handler(req, res) {
         INSERT INTO audit_logs(actor_uid,action,entity_type,entity_id,details)
         SELECT ${actor.uid},'package_status_changed','package',id::text,jsonb_build_object('name',name,'status',status) FROM changed RETURNING id
       ) SELECT id,name,status FROM changed`;
+    } else if (action === "package-save") {
+      const packageId = String(body.package_id || "").trim();
+      const name = String(body.name || "").trim().slice(0, 120);
+      const packageCode = String(body.package_code || "").trim().toUpperCase().replace(/[^A-Z0-9_-]/g, "_").slice(0, 60);
+      const packageType = String(body.package_type || "").trim().toLowerCase();
+      const description = String(body.description || "").trim().slice(0, 1000);
+      const price = Number(body.price);
+      const roiRate = Number(body.roi_rate);
+      const durationDays = Number(body.duration_days);
+      const packageStatus = String(body.status || "active").trim().toLowerCase();
+      if (!name || !packageCode || !["basic", "fd"].includes(packageType)) return res.status(400).json({ error: "Enter package name, code and select Basic or FD." });
+      if (!Number.isFinite(price) || price <= 0 || price > 100000000 || !Number.isFinite(roiRate) || roiRate < 0 || roiRate > 100 || !Number.isInteger(durationDays) || durationDays < 1 || durationDays > 36500) return res.status(400).json({ error: "Enter a valid amount, daily return percentage (0–100), and duration in days." });
+      if (!["active", "paused", "draft", "archived"].includes(packageStatus)) return res.status(400).json({ error: "Invalid package status." });
+      if (packageId) {
+        result = await db`UPDATE packages SET name=${name}, package_code=${packageCode}, package_type=${packageType}, price=${price}, roi_rate=${roiRate}, duration_days=${durationDays}, currency='USDT', description=${description}, status=${packageStatus}, updated_at=now() WHERE id::text=${packageId} RETURNING id,name,package_code,package_type,price,roi_rate,duration_days,currency,description,status,created_at,updated_at`;
+      } else {
+        result = await db`INSERT INTO packages (name, package_code, package_type, price, roi_rate, duration_days, currency, description, status) VALUES (${name},${packageCode},${packageType},${price},${roiRate},${durationDays},'USDT',${description},${packageStatus}) RETURNING id,name,package_code,package_type,price,roi_rate,duration_days,currency,description,status,created_at,updated_at`;
+      }
+      if (result.length) await db`INSERT INTO audit_logs(actor_uid,action,entity_type,entity_id,details) VALUES (${actor.uid},${packageId ? 'package_updated' : 'package_created'},'package',${String(result[0].id)},${JSON.stringify({name,packageCode,packageType,price,roiRate,durationDays,status:packageStatus})}::jsonb)`;
     } else if (action === "save-settings") {
       const settings = body.settings;
       if (!settings || typeof settings !== "object" || Array.isArray(settings)) return res.status(400).json({ error: "Settings payload is required." });
