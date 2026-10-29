@@ -167,6 +167,10 @@ export default async function handler(req, res) {
     }
 
     if (!result?.length) return res.status(409).json({ error: "No pending matching record was changed. It may already be reviewed or may not exist." });
+    if (action === "save-settings") {
+      const saved = await db`SELECT setting_value, updated_at FROM system_settings WHERE setting_key='platform' LIMIT 1`;
+      return res.status(200).json({ ok: true, record: result[0], settings: saved[0]?.setting_value || {}, updatedAt: saved[0]?.updated_at || null });
+    }
     return res.status(200).json({ ok: true, record: result[0] });
   } catch (error) {
     console.error("[NovoPay API] /api/admin-actions failed", { name: error?.name, code: error?.code, status: error?.status });
