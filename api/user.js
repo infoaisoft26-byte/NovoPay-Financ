@@ -273,6 +273,20 @@ export default async function handler(req, res) {
       return res.status(403).json({ error: "Your account is not active. Please contact NovoPay support." });
     }
 
+    if (section === "profile") {
+      return res.status(200).json({
+        ok: true, section, user: profile, rows: [],
+        profileDetails: {
+          novopay_id: profile.novopay_id,
+          full_name: profile.full_name,
+          email: profile.email || decoded.email || "",
+          mobile: profile.mobile || "",
+          status: profile.status,
+          created_at: profile.created_at,
+        },
+      });
+    }
+
     if (section === "overview") {
       const [recentTransactions, pendingDeposits, pendingWithdrawals, activePackages, activations, incomeLedger, sponsorRows, packageRows, countedIncomeRows] = await Promise.all([
         db`SELECT id, reference, type, amount, currency, status, description, created_at FROM ledger_transactions WHERE user_id = ${profile.novopay_id} ORDER BY created_at DESC LIMIT 5`,
