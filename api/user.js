@@ -143,8 +143,14 @@ export default async function handler(req, res) {
     }
 
     const section = String(req.query?.section || "overview").toLowerCase();
-    const depositAddress = String(process.env.NOVOPAY_BEP20_DEPOSIT_ADDRESS || "").trim();
-    const brochureUrl = String(process.env.NOVOPAY_BROCHURE_URL || "").trim();
+    await db`CREATE TABLE IF NOT EXISTS system_settings (setting_key text PRIMARY KEY, setting_value jsonb NOT NULL DEFAULT '{}'::jsonb, updated_at timestamptz NOT NULL DEFAULT now(), updated_by text)`;
+    const platformRows = await db`SELECT setting_value FROM system_settings WHERE setting_key='platform' LIMIT 1`;
+    const platformSettings = platformRows[0]?.setting_value || {};
+    const depositAddress = String(platformSettings.depositAddress || process.env.NOVOPAY_BEP20_DEPOSIT_ADDRESS || "").trim();
+    const brochureUrl = String(platformSettings.brochurePdfUrl || process.env.NOVOPAY_BROCHURE_URL || "").trim();
+    const maintenanceMode = platformSettings.maintenanceMode === true;
+    if (maintenanceMode && decoded.admin !== true) return res.status(503).json({ error: "NovoPay Finance is temporarily under maintenance. Please try again later.", maintenanceMode: true });
+
     const rawSearch = typeof req.query?.q === "string" ? req.query.q.trim().slice(0, 100) : "";
     const pattern = `%${rawSearch.replace(/[\\%_]/g, "\\$&")}%`;
     const parsedLimit = Number.parseInt(String(req.query?.limit || "50"), 10);
@@ -170,13 +176,13 @@ export default async function handler(req, res) {
         db`SELECT count(*)::int AS count FROM package_activations WHERE user_id = ${profile.novopay_id} AND status = 'active'`,
       ]);
       return res.status(200).json({
-        ok: true, section, user: profile, rows: recentTransactions, recentTransactions, depositAddress, brochureUrl,
+        ok: true, section, user: profile, rows: recentTransactions, recentTransactions, depositAddress, brochureUrl, maintenanceMode, platformSettings,
         summary: { pendingDeposits: pendingDeposits[0]?.count ?? 0, pendingWithdrawals: pendingWithdrawals[0]?.count ?? 0, activePackages: activePackages[0]?.count ?? 0 },
       });
     }
     if (section === "wallet") {
       const rows = await queries.transactions(db, profile.novopay_id, pattern, limit);
-      return res.status(200).json({ ok: true, section, user: profile, rows, depositAddress, brochureUrl });
+      return res.status(200).json({ ok: true, section, user: profile, rows, depositAddress, brochureUrl, maintenanceMode, platformSettings });
     }
     if (section === "referrals") {
       const [members, commissions, summary] = await Promise.all([
@@ -186,13 +192,13 @@ export default async function handler(req, res) {
       ]);
       return res.status(200).json({ ok: true, section, user: profile, rows: commissions, members, referralSummary: summary[0] });
     }
-    if (section === "brochure") return res.status(200).json({ ok: true, section, user: profile, brochureUrl });
+    if (section === "brochure") return res.status(200).json({ ok: true, section, user: profile, brochureUrl, maintenanceMode, platformSettings });
     const query = queries[section];
     if (!query) return res.status(400).json({ error: "Unknown account section." });
     const rows = await query(db, profile.novopay_id, pattern, limit);
     if (section === "packages") {
       const activations = await queries.activations(db, profile.novopay_id, pattern, limit);
-      return res.status(200).json({ ok: true, section, user: profile, rows, activations, depositAddress, brochureUrl });
+      return res.status(200).json({ ok: true, section, user: profile, rows, activations, depositAddress, brochureUrl, maintenanceMode, platformSettings });
     }
     return res.status(200).json({ ok: true, section, user: profile, rows, depositAddress, brochureUrl });
   } catch (error) {
