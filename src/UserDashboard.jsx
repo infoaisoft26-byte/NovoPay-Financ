@@ -185,8 +185,7 @@ export default function UserDashboard({ user, onLogout }) {
     <main className="np-user-shell">
       <aside className={`np-user-sidebar ${mobileOpen ? "open" : ""}`}>
         <div className="np-user-brand-row">
-          <span className="np-user-brand-icon"><Wallet size={22} /></span>
-          <span className="np-user-brand">NovoPay <b>Finance</b><small>MEMBER PORTAL</small></span>
+          <span className="np-user-brand"><img className="np-sidebar-logo" src="/novopay-logo.svg" alt="NovoPay Finance" /><small>MEMBER PORTAL</small></span>
           <button className="np-user-close" onClick={() => setMobileOpen(false)} aria-label="Close menu"><X size={19} /></button>
         </div>
         <div className="np-user-member">
