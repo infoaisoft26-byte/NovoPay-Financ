@@ -1,4 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { EmailAuthProvider, reauthenticateWithCredential, updateEmail, updatePassword } from "firebase/auth";
+import { auth } from "./firebase.js";
 import {
   Activity, ArrowDownLeft, ArrowLeftRight, ArrowUpRight, Bell, ChevronRight, Users, Copy,
   CircleHelp, Clock3, CreditCard, Download, FileText, Home, Layers3, LogOut,
@@ -111,6 +113,10 @@ export default function UserDashboard({ user, onLogout }) {
   const [payoutAddress, setPayoutAddress] = useState("");
   const [p2pRecipient, setP2pRecipient] = useState("");
   const [p2pAmount, setP2pAmount] = useState("");
+  const [profileMobile, setProfileMobile] = useState("");
+  const [newEmail, setNewEmail] = useState("");
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -155,6 +161,7 @@ export default function UserDashboard({ user, onLogout }) {
   }, [user, section, query]);
 
   useEffect(() => { load(); }, [load]);
+  useEffect(() => { setProfileMobile(data?.user?.mobile || ""); }, [data?.user?.mobile]);
   useEffect(() => {
     const timer = window.setInterval(() => load(), 15000);
     return () => window.clearInterval(timer);
@@ -175,6 +182,63 @@ export default function UserDashboard({ user, onLogout }) {
       await load();
     } catch (err) { setActionMessage(err.message || "Request could not be completed."); }
     finally { setActionBusy(false); }
+  }
+
+  async function saveProfile(e) {
+    e.preventDefault();
+    setActionBusy(true);
+    setActionMessage("");
+    try {
+      const currentUser = auth?.currentUser || user;
+      const emailToChange = newEmail.trim().toLowerCase();
+      if (!currentUser?.email) throw new Error("Please sign in again before changing account details.");
+      if (!currentPassword) throw new Error("Enter your current password to confirm these changes.");
+      if (emailToChange && !/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(emailToChange)) throw new Error("Enter a valid new email address.");
+      if (newPassword && newPassword.length < 8) throw new Error("New password must contain at least 8 characters.");
+      const credential = EmailAuthProvider.credential(currentUser.email, currentPassword);
+      await reauthenticateWithCredential(currentUser, credential);
+
+      if (emailToChange && emailToChange !== String(currentUser.email || "").toLowerCase()) {
+        await updateEmail(currentUser, emailToChange);
+        const token = await currentUser.getIdToken(true);
+        const sync = await fetch("/api/user-actions", {
+          method: "POST",
+          headers: { Authorization: "Bearer " + token, "Content-Type": "application/json" },
+          body: JSON.stringify({ action: "sync-email" }),
+        });
+        const syncResult = await sync.json().catch(() => ({}));
+        if (!sync.ok) throw new Error(syncResult.error || "Email was changed in sign-in but profile sync needs a retry.");
+      }
+
+      const token = await currentUser.getIdToken(true);
+      const response = await fetch("/api/user-actions", {
+        method: "POST",
+        headers: { Authorization: "Bearer " + token, "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "update-profile", mobile: profileMobile }),
+      });
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(result.error || "Profile details could not be saved.");
+
+      if (newPassword) await updatePassword(currentUser, newPassword);
+      setNewEmail("");
+      setCurrentPassword("");
+      setNewPassword("");
+      setActionMessage("Your profile has been updated successfully.");
+      await load();
+    } catch (err) {
+      const code = err?.code || "";
+      const friendly = code === "auth/wrong-password" || code === "auth/invalid-credential"
+        ? "Current password is incorrect."
+        : code === "auth/email-already-in-use" ? "This email address is already in use."
+        : code === "auth/invalid-email" ? "Enter a valid email address."
+        : code === "auth/weak-password" ? "Choose a stronger password with at least 8 characters."
+        : code === "auth/requires-recent-login" ? "Please sign in again, then retry this change."
+        : code === "auth/too-many-requests" ? "Too many attempts. Please wait and try again."
+        : (err.message || "Profile changes could not be saved.");
+      setActionMessage(friendly);
+    } finally {
+      setActionBusy(false);
+    }
   }
 
   function chooseSection(next) {
@@ -352,7 +416,7 @@ export default function UserDashboard({ user, onLogout }) {
           </section>}
           {!error && section === "transfer-income-fund" && <section className="np-user-panel"><PanelTitle title="Transfer Income To Fund" subtitle="Move funds between your own NovoPay wallets. This is recorded in your ledger." /><div className="np-user-stats"><Stat icon={Activity} label="Available Income" value={profile ? money(profile.income_balance) : "—"} tone="green" /><Stat icon={Wallet} label="Fund Wallet" value={profile ? money(profile.fund_balance) : "—"} tone="blue" /></div><form className="np-user-action-form" onSubmit={e => { e.preventDefault(); submitAction("income-to-fund", { amount: withdrawAmount }); }}><label>Amount (USDT)<input type="number" min="0.00000001" step="0.00000001" required value={withdrawAmount} onChange={e => setWithdrawAmount(e.target.value)} /></label><button disabled={actionBusy || !profile || Number(profile.income_balance || 0) <= 0}>{actionBusy ? "Processing…" : "Transfer to Fund Wallet"}</button>{actionMessage && <p role="status">{actionMessage}</p>}</form></section>}
           {!error && section === "brochure" && <section className="np-user-panel"><PanelTitle title="Download Brochure" subtitle="Official NovoPay brochure configured by the administrator." />{data?.brochureUrl ? <a className="np-user-primary-link" href={data.brochureUrl} target="_blank" rel="noreferrer"><Download size={17}/> Open / Download Brochure</a> : <Empty title="Brochure not configured" message="The brochure is temporarily unavailable. Please check back later." />}</section>}
-          {!error && section === "profile" && <section className="np-user-panel"><PanelTitle title="Profile information" subtitle="Verified details from your NovoPay account" />{profile ? <div className="np-user-profile-grid"><ProfileField label="Full name" value={profile.full_name} /><ProfileField label="NovoPay ID" value={profile.novopay_id} /><ProfileField label="Email address" value={profile.email} /><ProfileField label="Account status" value={profile.status} /><ProfileField label="Member since" value={date(profile.created_at)} /></div> : <Empty title="Profile not ready" message="Your verified profile will appear here once the account record has been created." />}</section>}
+          {!error && section === "profile" && <section className="np-user-panel np-user-profile-panel"><PanelTitle title="My Profile" subtitle="Manage your contact details and sign-in security" />{profile ? <><div className="np-user-profile-grid"><ProfileField label="Full name" value={profile.full_name} /><ProfileField label="NovoPay ID" value={profile.novopay_id} /><ProfileField label="Current email" value={profile.email || user.email} /><ProfileField label="Account status" value={profile.status} /><ProfileField label="Member since" value={date(profile.created_at)} /></div><form className="np-user-action-form np-user-profile-form" onSubmit={saveProfile}><div className="np-user-profile-form-heading"><ShieldCheck size={18}/><div><b>Contact details & security</b><small>Current password is required to confirm account changes.</small></div></div><label>Phone number<input type="tel" inputMode="numeric" autoComplete="tel" value={profileMobile} onChange={e => setProfileMobile(e.target.value)} placeholder="10-digit mobile number" maxLength={15} /></label><label>Change email address<input type="email" autoComplete="email" value={newEmail} onChange={e => setNewEmail(e.target.value)} placeholder={profile.email || user.email || "Enter new email address"} /></label><label>Current password<input type="password" autoComplete="current-password" required value={currentPassword} onChange={e => setCurrentPassword(e.target.value)} placeholder="Enter current password" /></label><label>New password (optional)<input type="password" autoComplete="new-password" minLength={8} value={newPassword} onChange={e => setNewPassword(e.target.value)} placeholder="At least 8 characters" /></label><button type="submit" disabled={actionBusy}>{actionBusy ? "Saving changes…" : "Save profile changes"}</button>{actionMessage && <p role="status">{actionMessage}</p>}</form></> : <Empty title="Profile not ready" message="Your verified profile will appear here once the account record has been created." />}</section>}
           {!error && section === "support" && <section className="np-user-panel"><PanelTitle title="Support" subtitle="Your support history" /><Records rows={rows} type="support" loading={loading} /><div className="np-user-support-note"><CircleHelp size={19} /><div><b>Need help?</b><p>You can contact our support team if you need help with your account.</p></div></div></section>}
         </div>
         <footer className="np-user-footer"><span>© {new Date().getFullYear()} NovoPay Finance</span><span>Developed by <strong>AISOFT Studio</strong></span></footer>
