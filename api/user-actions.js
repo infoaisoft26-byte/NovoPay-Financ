@@ -193,7 +193,7 @@ export default async function handler(req, res) {
     if (action === "package-purchase") {
       const packageId = String(req.body?.package_id || "");
       if (!/^[0-9a-f-]{36}$/i.test(packageId)) fail("Select a valid package.");
-      const packages = await sql`SELECT id, name, price, currency, status FROM packages WHERE id = ${packageId}::uuid LIMIT 1`;
+      const packages = await sql`SELECT id, name, price, currency, status, to_jsonb(p)->>'package_type' AS package_type FROM packages p WHERE id = ${packageId}::uuid LIMIT 1`;
       const pkg = packages[0];
       if (!pkg || pkg.status !== "active") fail("This package is not currently available.", 409);
       const purchaseRef = reference;
@@ -235,9 +235,9 @@ export default async function handler(req, res) {
         INSERT INTO ledger_transactions (reference, user_id, type, amount, currency, status, description, idempotency_key)
         SELECT ${"RL" + purchaseRef + "L"} || sponsor_credit.level::text,
                sponsor_credit.novopay_id,
-               CASE WHEN sponsor_credit.level = 1 THEN 'referral_income' ELSE 'level_income' END,
+               CASE WHEN sponsor_credit.level = 1 THEN 'referral_income' WHEN lower(COALESCE(pkg.package_type, '')) = 'basic' THEN 'basic_level_income' WHEN lower(COALESCE(pkg.package_type, '')) = 'fd' THEN 'fd_level_income' ELSE 'level_income' END,
                sponsor_credit.amount, sponsor_credit.currency, 'posted',
-               CASE WHEN sponsor_credit.level = 1 THEN 'Level 1 direct referral income (7%) for package activation ' ELSE 'Level ' || sponsor_credit.level::text || ' income (1%) for package activation ' END || ${purchaseRef},
+               CASE WHEN sponsor_credit.level = 1 THEN 'Level 1 direct referral income (7%) for package activation ' ELSE 'Level ' || sponsor_credit.level::text || ' income (1%) from ' || COALESCE(pkg.package_type, 'package') || ' package activation ' END || ${purchaseRef},
                ${"referral:" + purchaseRef + ":L"} || sponsor_credit.level::text
         FROM sponsor_credit
         ON CONFLICT (idempotency_key) DO NOTHING
