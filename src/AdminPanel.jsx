@@ -8,6 +8,9 @@ import {
   PackageCheck, ShieldAlert, Network, Gauge, Download, Plus, Pencil, Save
 } from "lucide-react";
 
+
+const makeQrUrl = (value, size = 240) => value ? `https://api.qrserver.com/v1/create-qr-code/?size=${size}x${size}&margin=10&data=${encodeURIComponent(value)}` : "";
+
 const navGroups = [
   { title: "WORKSPACE", items: [
     { label: "Overview", icon: LayoutDashboard },
@@ -429,10 +432,10 @@ export default function AdminPanel({ user, onLogout }) {
                   <label>Network<input value="BNB Smart Chain (BEP20)" readOnly /></label>
                   <label>Asset<input value="USDT" readOnly /></label>
                   <label>Wallet / Open Link<input value={platformSettings.walletLink || ""} placeholder="https://…" onChange={e=>setPlatformSettings(v=>({...v,walletLink:e.target.value}))}/></label>
-                  <label>QR Image URL<input value={platformSettings.qrImageUrl || ""} placeholder="https://…" onChange={e=>setPlatformSettings(v=>({...v,qrImageUrl:e.target.value}))}/></label>
+                  <label>QR Image URL<input value={platformSettings.qrImageUrl || ""} placeholder="Public direct image URL (optional)" onChange={e=>setPlatformSettings(v=>({...v,qrImageUrl:e.target.value.trim()}))}/><small>QR will still appear from the wallet address if this link is a sharing page or does not load as an image.</small></label>
                   <label className="wide">Network Notice / Warning<textarea value={platformSettings.networkNotice || ""} onChange={e=>setPlatformSettings(v=>({...v,networkNotice:e.target.value}))}/></label>
                 </div>
-                {platformSettings.qrImageUrl && <div className="np-admin-qr-preview"><img src={platformSettings.qrImageUrl} alt="USDT BEP20 deposit QR preview" onError={e=>{e.currentTarget.style.display="none"}}/><span>USDT BEP20 deposit QR preview</span></div>}
+                <div className="np-admin-qr-preview"><img src={platformSettings.qrImageUrl || makeQrUrl(platformSettings.depositAddress || "0xBF2bfe77a6Fc846cF9881A5A93508c7D5d6658b3", 220)} alt="USDT BEP20 deposit QR preview" onError={e=>{if(!e.currentTarget.dataset.qrFallback){e.currentTarget.dataset.qrFallback="1";e.currentTarget.src=makeQrUrl(platformSettings.depositAddress || "0xBF2bfe77a6Fc846cF9881A5A93508c7D5d6658b3",220)}else{e.currentTarget.style.display="none"}}}/><span>{platformSettings.qrImageUrl ? "Uploaded QR preview (automatic wallet QR if link is not a direct image)" : "Automatic wallet QR preview"}</span></div>
               </section>
               <section className="np-admin-settings-card"><h3>Package Visibility</h3>
                 <label className="np-admin-toggle-row"><span><b>Basic Package</b><small>{platformSettings.basicPackageVisible ? "LIVE / Visible to users" : "HIDDEN"}</small></span><input type="checkbox" checked={!!platformSettings.basicPackageVisible} onChange={e=>setPlatformSettings(v=>({...v,basicPackageVisible:e.target.checked}))}/></label>
