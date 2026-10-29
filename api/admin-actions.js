@@ -40,19 +40,35 @@ export default async function handler(req, res) {
     if (action === "deposit-approve" && reference) {
       result = await db`WITH changed AS (
         UPDATE deposits d SET status='approved', reviewed_at=now(), reviewer_uid=${actor.uid}
-        FROM users u WHERE d.user_id=u.novopay_id AND d.reference=${reference} AND d.status='pending'
-        RETURNING d.reference,d.user_id,d.amount,d.currency
+        FROM users u
+        WHERE d.user_id=u.novopay_id AND d.reference=${reference} AND d.status='pending'
+          AND EXISTS (
+            SELECT 1 FROM audit_logs verified
+            WHERE verified.action='deposit_blockchain_verified'
+              AND verified.entity_id=d.reference
+              AND lower(verified.details->>'tx_hash')=lower(d.tx_hash)
+          )
+          AND NOT EXISTS (
+            SELECT 1 FROM ledger_transactions lt
+            WHERE lt.reference='NP-DEP-'||d.reference OR lt.idempotency_key='deposit-credit:'||d.reference
+          )
+        RETURNING d.reference,d.user_id,d.amount,d.currency,d.tx_hash
       ), credited AS (
         UPDATE users u SET fund_balance=u.fund_balance+c.amount, updated_at=now()
-        FROM changed c WHERE u.novopay_id=c.user_id RETURNING c.reference,c.user_id,c.amount,c.currency
+        FROM changed c WHERE u.novopay_id=c.user_id RETURNING c.reference,c.user_id,c.amount,c.currency,c.tx_hash
       ), ledger AS (
         INSERT INTO ledger_transactions(reference,user_id,type,amount,currency,status,description,idempotency_key)
-        SELECT 'NP-DEP-'||reference,user_id,'deposit_credit',amount,currency,'posted','Admin approved deposit '||reference,'deposit-credit:'||reference FROM credited
-        ON CONFLICT DO NOTHING RETURNING id
+        SELECT 'NP-DEP-'||reference,user_id,'deposit_credit',amount,currency,'posted',
+          'Admin approved verified USDT deposit ('||tx_hash||')','deposit-credit:'||reference FROM credited
+        RETURNING id
       ), audit AS (
         INSERT INTO audit_logs(actor_uid,action,entity_type,entity_id,details)
-        SELECT ${actor.uid},'deposit_approved','deposit',reference,jsonb_build_object('user_id',user_id,'amount',amount,'currency',currency) FROM credited RETURNING id
-      ) SELECT reference,user_id,amount FROM credited`;
+        SELECT ${actor.uid},'deposit_approved','deposit',reference,
+          jsonb_build_object('user_id',user_id,'amount',amount,'currency',currency,'tx_hash',tx_hash)
+        FROM credited RETURNING id
+      ) SELECT credited.reference,credited.user_id,credited.amount,credited.currency FROM credited
+      CROSS JOIN (SELECT count(*) FROM ledger) ledger_guard
+      CROSS JOIN (SELECT count(*) FROM audit) audit_guard`;
     } else if (action === "deposit-reject" && reference) {
       result = await db`WITH changed AS (
         UPDATE deposits SET status='rejected', reviewed_at=now(), reviewer_uid=${actor.uid}
