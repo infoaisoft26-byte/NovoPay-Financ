@@ -9,8 +9,10 @@ export default async function handler(req, res) {
   try {
     if (!process.env.DATABASE_URL) return res.status(503).json({ valid: false, error: "Registration service is temporarily unavailable." });
     if (!sql) sql = neon(process.env.DATABASE_URL);
+    if (code === "NA00501") return res.status(200).json({ valid: true, sponsor: { id: "NA00501", name: "NovoPay Finance" } });
+    await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS referral_code text`;
     const rows = await sql`SELECT novopay_id, COALESCE(NULLIF(full_name, ''), 'NovoPay member') AS sponsor_name FROM users WHERE status = 'active' AND (upper(COALESCE(referral_code, '')) = ${code} OR upper(novopay_id) = ${code}) LIMIT 1`;
-    if (!rows[0]) return res.status(404).json({ valid: false, error: "Sponsor ID is invalid or inactive." });
+    if (!rows[0]) return res.status(404).json({ valid: false, error: "Referral ID is invalid or inactive." });
     return res.status(200).json({ valid: true, sponsor: { id: rows[0].novopay_id, name: rows[0].sponsor_name } });
   } catch (error) {
     console.error("[NovoPay API] referral check failed", { message: error?.message, code: error?.code });
