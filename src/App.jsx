@@ -86,7 +86,7 @@ export default function App() {
         // Normalize common Indian formats to the same 10-digit number.
         if (normalizedMobile.length === 12 && normalizedMobile.startsWith("91")) normalizedMobile = normalizedMobile.slice(2);
         else if (normalizedMobile.length === 11 && normalizedMobile.startsWith("0")) normalizedMobile = normalizedMobile.slice(1);
-        if (normalizedMobile.length < 10 || normalizedMobile.length > 15) throw new Error("Mobile number sahi enter karein: 10 digits, ya +91 ke saath 12 digits.");
+        // Mobile is optional; do not block registration based on its length.
         if (!code) throw new Error("Referral ID is required to register.");
         const validationResponse = await fetch("/api/referral-check?code=" + encodeURIComponent(code), { cache: "no-store" });
         const validation = await validationResponse.json().catch(() => ({}));
@@ -235,7 +235,7 @@ function AuthScreen({ mode, setMode, name, setName, mobile, setMobile, sponsorCo
               <>
                 <label className="np-field"><span>Full name</span><input value={name} onChange={(e) => setName(e.target.value)} placeholder="Enter your full name" autoComplete="name" maxLength={120} required /></label>
                 <label className="np-field"><span>Email address</span><input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@example.com" autoComplete="email" required /></label>
-                <label className="np-field"><span>Mobile number</span><input type="tel" inputMode="tel" value={mobile} onChange={(e) => setMobile(e.target.value)} placeholder="Enter mobile number" autoComplete="tel" minLength={10} maxLength={18} pattern="\+?[0-9 ()-]{10,18}" required /></label>
+                <label className="np-field"><span>Mobile number (optional)</span><input type="tel" inputMode="tel" value={mobile} onChange={(e) => setMobile(e.target.value)} placeholder="Enter mobile number" autoComplete="tel" maxLength={30} /></label>
                 <label className="np-field"><span>Referral ID</span><input value={sponsorCode} onChange={(e) => setSponsorCode(e.target.value.toUpperCase())} placeholder="Enter referral ID" autoComplete="off" maxLength={80} required /></label>
               </>
             )}
