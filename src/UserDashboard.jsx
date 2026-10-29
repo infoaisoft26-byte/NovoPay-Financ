@@ -6,32 +6,74 @@ import {
 } from "lucide-react";
 import "./user-dashboard.css";
 
-const NAV = [
-  { id: "overview", label: "Overview", icon: Home },
-  { id: "wallet", label: "My Wallet", icon: Wallet },
-  { id: "deposits", label: "Deposits", icon: ArrowDownLeft },
-  { id: "withdrawals", label: "Withdrawals", icon: ArrowUpRight },
-  { id: "transactions", label: "Transactions", icon: Activity },
-  { id: "packages", label: "Packages", icon: Layers3 },
-  { id: "referrals", label: "Referrals & Income", icon: Users },
-  { id: "p2p", label: "P2P Transfer", icon: ArrowLeftRight },
-  { id: "support", label: "Help & Support", icon: CircleHelp },
-  { id: "profile", label: "My Profile", icon: UserRound },
+const NAV_GROUPS = [
+  { title: "FINANCE", items: [
+    { id: "overview", label: "Dashboard", icon: Home },
+    { id: "brochure", label: "Download Brochure", icon: Download },
+    { id: "deposits", label: "Recharge Fund", icon: ArrowDownLeft },
+  ]},
+  { title: "TRANSACTIONAL", items: [
+    { id: "transactions", label: "Transaction Ledger", icon: Activity },
+    { id: "p2p", label: "P2P Transfer", icon: ArrowLeftRight },
+    { id: "transfer-income-fund", label: "Transfer Income To Fund", icon: CreditCard },
+    { id: "withdrawals", label: "Fund Withdrawal", icon: ArrowUpRight },
+  ]},
+  { title: "PACKAGE ACTIVATION", items: [
+    { id: "basic-package", label: "Basic Package", icon: Package },
+    { id: "fd-package", label: "FD Package", icon: Layers3 },
+    { id: "package-requests", label: "Package Requests", icon: Clock3 },
+  ]},
+  { title: "DOWNLINE", items: [
+    { id: "direct-team", label: "Direct Team", icon: Users },
+    { id: "team-list", label: "Team List", icon: Users },
+  ]},
+  { title: "INCOME", items: [
+    { id: "income-all", label: "Income History (All)", icon: Activity },
+    { id: "basic-roi", label: "Basic ROI Income", icon: Activity },
+    { id: "basic-referral", label: "Basic Referral Income", icon: Users },
+    { id: "basic-level", label: "Basic Level Income", icon: Users },
+    { id: "fd-roi", label: "FD ROI Income", icon: Activity },
+    { id: "fd-referral", label: "FD Referral Income", icon: Users },
+    { id: "fd-level", label: "FD Level Income", icon: Users },
+    { id: "salary", label: "Salary Income", icon: CreditCard },
+  ]},
+  { title: "REPORTS & SUPPORT", items: [
+    { id: "reports", label: "Reports", icon: FileText },
+    { id: "support", label: "Support Tickets", icon: CircleHelp },
+    { id: "wallet", label: "My Wallet", icon: Wallet },
+    { id: "profile", label: "My Profile", icon: UserRound },
+  ]},
 ];
+const NAV = NAV_GROUPS.flatMap(group => group.items);
 
 const TITLES = {
   overview: ["Dashboard", "Your account at a glance."],
+  brochure: ["Download Brochure", "Get the latest NovoPay information."],
   wallet: ["My Wallet", "Review your available balances."],
-  deposits: ["Deposits", "Track your deposit requests."],
-  withdrawals: ["Withdrawals", "Review withdrawal request history."],
-  transactions: ["Transactions", "Your account ledger, newest first."],
+  deposits: ["Recharge Fund", "Send USDT on BNB Smart Chain (BEP-20) and submit the transaction hash."],
+  withdrawals: ["Fund Withdrawal", "Request a payout and track admin review."],
+  transactions: ["Transaction Ledger", "Your account ledger, newest first."],
   packages: ["Packages", "Available packages configured by NovoPay."],
+  "basic-package": ["Basic Package", "Browse and activate available Basic packages."],
+  "fd-package": ["FD Package", "Browse and activate available FD packages."],
+  "package-requests": ["Package Requests", "Track package activation requests."],
   referrals: ["Referrals & Income", "Your referral ID, direct members and credited rewards."],
-  p2p: ["P2P Transfer", "Peer-to-peer transfers are not enabled yet."],
-  support: ["Help & Support", "Get help with your account."],
+  p2p: ["P2P Transfer", "View P2P transfers associated with your account."],
+  "transfer-income-fund": ["Transfer Income To Fund", "Move available income balance to your Fund Wallet."],
+  "direct-team": ["Direct Team", "Members directly sponsored by your account."],
+  "team-list": ["Team List", "Your referral team across levels."],
+  "income-all": ["Income History (All)", "All credited income records from your NovoPay ledger."],
+  "basic-roi": ["Basic ROI Income", "Basic package ROI entries from your ledger."],
+  "basic-referral": ["Basic Referral Income", "Basic referral income entries from your ledger."],
+  "basic-level": ["Basic Level Income", "Basic level income entries from your ledger."],
+  "fd-roi": ["FD ROI Income", "FD package ROI entries from your ledger."],
+  "fd-referral": ["FD Referral Income", "FD referral income entries from your ledger."],
+  "fd-level": ["FD Level Income", "FD level income entries from your ledger."],
+  salary: ["Salary Income", "Salary entries recorded in your ledger."],
+  reports: ["Reports", "Summary of your own account activity."],
+  support: ["Support Tickets", "Track support requests linked to your account."],
   profile: ["My Profile", "Your registered account details."],
 };
-
 function money(value) {
   if (value === null || value === undefined || value === "") return "—";
   const n = Number(value);
@@ -108,6 +150,10 @@ export default function UserDashboard({ user, onLogout }) {
   }, [user, section, query]);
 
   useEffect(() => { load(); }, [load]);
+  useEffect(() => {
+    const timer = window.setInterval(() => load(), 15000);
+    return () => window.clearInterval(timer);
+  }, [load]);
 
   const profile = data?.user || null;
   const rows = useMemo(() => Array.isArray(data?.rows) ? data.rows : [], [data]);
@@ -146,10 +192,10 @@ export default function UserDashboard({ user, onLogout }) {
         </div>
         <p className="np-user-nav-label">ACCOUNT MENU</p>
         <nav className="np-user-nav">
-          {NAV.map(item => {
-            const Icon = item.icon;
-            return <button key={item.id} className={section === item.id ? "active" : ""} onClick={() => chooseSection(item.id)}><Icon size={17} /><span>{item.label}</span>{section === item.id && <ChevronRight size={15} />}</button>;
-          })}
+          {NAV_GROUPS.map(group => <div className="np-user-nav-group" key={group.title}>
+            <p className="np-user-nav-group-title">{group.title}</p>
+            {group.items.map(item => { const Icon = item.icon; return <button key={item.id} className={section === item.id ? "active" : ""} onClick={() => chooseSection(item.id)}><Icon size={17} /><span>{item.label}</span>{section === item.id && <ChevronRight size={15} />}</button>; })}
+          </div>)}
         </nav>
         <div className="np-user-sidebar-bottom">
           <div className="np-user-security"><ShieldCheck size={18} /><span><b>Account security</b><small>Signed in securely</small></span></div>
@@ -199,10 +245,13 @@ export default function UserDashboard({ user, onLogout }) {
           )}
 
           {!error && section === "wallet" && <><div className="np-user-stats"><Stat icon={Wallet} label="Fund Wallet" value={profile ? money(profile.fund_balance) : "—"} tone="blue" /><Stat icon={Activity} label="Income Wallet" value={profile ? money(profile.income_balance) : "—"} tone="green" /></div><section className="np-user-panel"><PanelTitle title="Wallet ledger" subtitle="Verified wallet entries" /><Records rows={rows} type="transactions" loading={loading} /></section></>}
-          {!error && section === "deposits" && <section className="np-user-panel"><PanelTitle title="Request a USDT deposit" subtitle="Submit your BSC transaction hash; credit happens only after verification." /><form className="np-user-action-form" onSubmit={e => { e.preventDefault(); submitAction("deposit-request", { amount: depositAmount, tx_hash: txHash }); }}><label>Amount (USDT)<input type="number" min="0.01" step="0.00000001" required value={depositAmount} onChange={e => setDepositAmount(e.target.value)} /></label><label>BSC transaction hash<input required minLength={64} maxLength={66} value={txHash} onChange={e => setTxHash(e.target.value.trim())} placeholder="0x…" /></label><button disabled={actionBusy}>{actionBusy ? "Submitting…" : "Submit deposit request"}</button>{actionMessage && <p role="status">{actionMessage}</p>}</form><div className="np-user-table-toolbar"><PanelTitle title="Deposit history" subtitle="Your submitted requests" /><label className="np-user-search"><Search size={16} /><input value={query} onChange={e => setQuery(e.target.value)} placeholder="Search records…" /></label></div><Records rows={rows} type={section} loading={loading} /></section>}
+          {!error && section === "deposits" && <section className="np-user-panel"><PanelTitle title="USDT Recharge Wallet" subtitle="Network: BNB Smart Chain (BEP-20). Send USDT only on this network." />
+            <div className="np-user-deposit-address-card"><div><b>USDT deposit address</b><p>{data?.depositAddress || "Deposit address is not configured yet. Admin must set NOVOPAY_BEP20_DEPOSIT_ADDRESS in Vercel."}</p><small>Network: BSC / BEP-20 · Token: USDT</small></div><button type="button" disabled={!data?.depositAddress} onClick={async () => { try { await navigator.clipboard.writeText(data.depositAddress); setActionMessage("Deposit wallet address copied."); } catch { setActionMessage("Please select and copy the wallet address."); } }}><Copy size={15}/> Copy address</button></div>
+            {actionMessage && <p role="status">{actionMessage}</p>}
+            <PanelTitle title="Submit deposit transaction" subtitle="Submit your BSC transaction hash; funds are credited only after verification." /><form className="np-user-action-form" onSubmit={e => { e.preventDefault(); submitAction("deposit-request", { amount: depositAmount, tx_hash: txHash }); }}><label>Amount (USDT)<input type="number" min="2" step="0.00000001" required value={depositAmount} onChange={e => setDepositAmount(e.target.value)} /></label><label>BSC transaction hash<input required minLength={64} maxLength={66} value={txHash} onChange={e => setTxHash(e.target.value.trim())} placeholder="0x…" /></label><button disabled={actionBusy}>{actionBusy ? "Submitting…" : "Submit deposit request"}</button>{actionMessage && <p role="status">{actionMessage}</p>}</form><div className="np-user-table-toolbar"><PanelTitle title="Deposit history" subtitle="Your submitted requests" /><label className="np-user-search"><Search size={16} /><input value={query} onChange={e => setQuery(e.target.value)} placeholder="Search records…" /></label></div><Records rows={rows} type={section} loading={loading} /></section>}
           {!error && section === "withdrawals" && <section className="np-user-panel"><PanelTitle title="Request a withdrawal" subtitle="5% service fee; payout is reviewed by admin. Confirm your address carefully." /><form className="np-user-action-form" onSubmit={e => { e.preventDefault(); submitAction("withdrawal-request", { amount: withdrawAmount, payout_address: payoutAddress }); }}><label>Amount (USDT)<input type="number" min="0.01" step="0.00000001" required value={withdrawAmount} onChange={e => setWithdrawAmount(e.target.value)} /></label><label>BSC payout address<input required pattern="0x[a-fA-F0-9]{40}" value={payoutAddress} onChange={e => setPayoutAddress(e.target.value.trim())} placeholder="0x…" /></label><button disabled={actionBusy}>{actionBusy ? "Submitting…" : "Request withdrawal"}</button>{actionMessage && <p role="status">{actionMessage}</p>}</form><div className="np-user-table-toolbar"><PanelTitle title="Withdrawal history" subtitle="Your submitted requests" /><label className="np-user-search"><Search size={16} /><input value={query} onChange={e => setQuery(e.target.value)} placeholder="Search records…" /></label></div><Records rows={rows} type={section} loading={loading} /></section>}
-          {!error && ["transactions", "p2p", "support"].includes(section) && <section className="np-user-panel np-user-table-panel"><div className="np-user-table-toolbar"><PanelTitle title={title[0]} subtitle="Records returned for your account" /><label className="np-user-search"><Search size={16} /><input value={query} onChange={e => setQuery(e.target.value)} placeholder="Search records…" /></label></div><Records rows={rows} type={section} loading={loading} /></section>}
-          {!error && section === "packages" && <><section className="np-user-panel"><PanelTitle title="My package activations" subtitle="Your package purchases and activation status" /><Records rows={data?.activations || []} type="activations" loading={loading} /></section><section className="np-user-panel"><PanelTitle title="Available packages" subtitle="NovoPay package catalog; returns are estimates, not guarantees" />{loading ? <Loading /> : rows.length ? <div className="np-user-package-grid">{rows.map(row => { const daily = Number(row.price || 0) * Number(row.roi_rate || 0) / 100; const total = daily * Number(row.duration_days || 0); return <article className="np-user-package" key={row.id}><span className="np-user-package-icon"><Package size={21} /></span><span className={`np-user-status ${statusClass(row.status)}`}>{row.status}</span><small className="np-user-eyebrow">{String(row.package_type || "package").toUpperCase()} {row.package_code ? "· " + row.package_code : ""}</small><h3>{row.name}</h3><strong>{money(row.price)}</strong><p>{row.description || "Package terms are configured by NovoPay."}</p>{row.roi_rate != null && row.duration_days != null && <div className="np-user-package-terms"><p>Daily rate: <b>{Number(row.roi_rate).toFixed(2)}%</b></p><p>Daily amount: <b>{money(daily)}</b></p><p>Duration: <b>{Number(row.duration_days)} days</b></p><p>Total scheduled return: <b>{money(total)}</b></p>{row.package_type === "fd" && <p>Maturity estimate: <b>{money(Number(row.price) + total)}</b></p>}</div>}<button disabled={actionBusy || Number(profile?.fund_balance || 0) < Number(row.price || 0)} onClick={() => { if (window.confirm("Activate " + row.name + " for " + money(row.price) + " from your Fund Wallet?")) submitAction("package-purchase", { package_id: row.id }); }}>{actionBusy ? "Processing…" : Number(profile?.fund_balance || 0) < Number(row.price || 0) ? "Insufficient balance" : "Activate package"}</button></article>; })}</div> : <Empty title="No packages available" message="Apply the NovoPay package migration to add the Basic and FD catalog." />}</section></>}
+          {!error && ["transactions", "p2p", "support", "income-all", "basic-roi", "basic-referral", "basic-level", "fd-roi", "fd-referral", "fd-level", "salary", "direct-team", "team-list", "package-requests", "reports"].includes(section) && <section className="np-user-panel np-user-table-panel"><div className="np-user-table-toolbar"><PanelTitle title={title[0]} subtitle="Records returned for your account" /><label className="np-user-search"><Search size={16} /><input value={query} onChange={e => setQuery(e.target.value)} placeholder="Search records…" /></label></div><Records rows={rows} type={section} loading={loading} /></section>}
+          {!error && ["packages", "basic-package", "fd-package"].includes(section) && <>{section === "packages" && <section className="np-user-panel"><PanelTitle title="My package activations" subtitle="Your package purchases and activation status" /><Records rows={data?.activations || []} type="activations" loading={loading} /></section>}<section className="np-user-panel"><PanelTitle title={section === "basic-package" ? "Available Basic packages" : section === "fd-package" ? "Available FD packages" : "Available packages"} subtitle="NovoPay package catalog; terms come from the configured database" />{loading ? <Loading /> : rows.length ? <div className="np-user-package-grid">{rows.map(row => { const daily = Number(row.price || 0) * Number(row.roi_rate || 0) / 100; const total = daily * Number(row.duration_days || 0); return <article className="np-user-package" key={row.id}><span className="np-user-package-icon"><Package size={21} /></span><span className={`np-user-status ${statusClass(row.status)}`}>{row.status}</span><small className="np-user-eyebrow">{String(row.package_type || "package").toUpperCase()} {row.package_code ? "· " + row.package_code : ""}</small><h3>{row.name}</h3><strong>{money(row.price)}</strong><p>{row.description || "Package terms are configured by NovoPay."}</p>{row.roi_rate != null && row.duration_days != null && <div className="np-user-package-terms"><p>Daily rate: <b>{Number(row.roi_rate).toFixed(2)}%</b></p><p>Daily amount: <b>{money(daily)}</b></p><p>Duration: <b>{Number(row.duration_days)} days</b></p><p>Total scheduled return: <b>{money(total)}</b></p>{row.package_type === "fd" && <p>Maturity estimate: <b>{money(Number(row.price) + total)}</b></p>}</div>}<button disabled={actionBusy || Number(profile?.fund_balance || 0) < Number(row.price || 0)} onClick={() => { if (window.confirm("Activate " + row.name + " for " + money(row.price) + " from your Fund Wallet?")) submitAction("package-purchase", { package_id: row.id }); }}>{actionBusy ? "Processing…" : Number(profile?.fund_balance || 0) < Number(row.price || 0) ? "Insufficient balance" : "Activate package"}</button></article>; })}</div> : <Empty title="No packages available" message="Apply the NovoPay package migration to add the Basic and FD catalog." />}</section></>}
           {!error && section === "referrals" && <section className="np-user-referrals">
             <div className="np-user-panel np-user-referral-card">
               <PanelTitle title="Your Referral ID" subtitle="Share this link so new members can register under your account." />
@@ -218,6 +267,8 @@ export default function UserDashboard({ user, onLogout }) {
             <section className="np-user-panel"><PanelTitle title="Referral reward history" subtitle="Direct rewards credited after eligible package activation" /><Records rows={rows} type="referrals" loading={loading} /></section>
             <section className="np-user-panel"><PanelTitle title="Your direct members" subtitle="Members registered with your referral ID" />{loading ? <Loading /> : data?.members?.length ? <div className="np-user-table-wrap"><table className="np-user-table"><thead><tr><th>NovoPay ID</th><th>Member</th><th>Status</th><th>Joined</th></tr></thead><tbody>{data.members.map(member => <tr key={member.novopay_id}><td><span className="np-user-ref">{member.novopay_id}</span></td><td>{member.full_name || "Member"}</td><td><span className={`np-user-status ${statusClass(member.status)}`}>{member.status}</span></td><td>{date(member.created_at)}</td></tr>)}</tbody></table></div> : <Empty title="No direct members yet" message="Share your referral link to invite new members." />}</section>
           </section>}
+          {!error && section === "transfer-income-fund" && <section className="np-user-panel"><PanelTitle title="Transfer Income To Fund" subtitle="Move funds between your own NovoPay wallets. This is recorded in your ledger." /><div className="np-user-stats"><Stat icon={Activity} label="Available Income" value={profile ? money(profile.income_balance) : "—"} tone="green" /><Stat icon={Wallet} label="Fund Wallet" value={profile ? money(profile.fund_balance) : "—"} tone="blue" /></div><form className="np-user-action-form" onSubmit={e => { e.preventDefault(); submitAction("income-to-fund", { amount: withdrawAmount }); }}><label>Amount (USDT)<input type="number" min="0.00000001" step="0.00000001" required value={withdrawAmount} onChange={e => setWithdrawAmount(e.target.value)} /></label><button disabled={actionBusy || !profile || Number(profile.income_balance || 0) <= 0}>{actionBusy ? "Processing…" : "Transfer to Fund Wallet"}</button>{actionMessage && <p role="status">{actionMessage}</p>}</form></section>}
+          {!error && section === "brochure" && <section className="np-user-panel"><PanelTitle title="Download Brochure" subtitle="Official NovoPay brochure configured by the administrator." />{data?.brochureUrl ? <a className="np-user-primary-link" href={data.brochureUrl} target="_blank" rel="noreferrer"><Download size={17}/> Open / Download Brochure</a> : <Empty title="Brochure not configured" message="Admin must set NOVOPAY_BROCHURE_URL in the NovoPay Vercel environment." />}</section>}
           {!error && section === "profile" && <section className="np-user-panel"><PanelTitle title="Profile information" subtitle="Verified details from your NovoPay account" />{profile ? <div className="np-user-profile-grid"><ProfileField label="Full name" value={profile.full_name} /><ProfileField label="NovoPay ID" value={profile.novopay_id} /><ProfileField label="Email address" value={profile.email} /><ProfileField label="Account status" value={profile.status} /><ProfileField label="Member since" value={date(profile.created_at)} /></div> : <Empty title="Profile not ready" message="Your verified profile will appear here once the account record has been created." />}</section>}
           {!error && section === "support" && <section className="np-user-panel"><PanelTitle title="Support" subtitle="Your support history" /><Records rows={rows} type="support" loading={loading} /><div className="np-user-support-note"><CircleHelp size={19} /><div><b>Need help?</b><p>Support ticket creation will be enabled when the secure account API is configured.</p></div></div></section>}
         </div>
@@ -245,7 +296,11 @@ function Empty({ title, message }) {
 function Records({ rows, type, loading }) {
   if (loading) return <Loading />;
   if (!rows?.length) return <Empty title="No records yet" message="There are no verified records to display for this section." />;
-  const columns = type === "referrals"
+  const columns = ["direct-team", "team-list"].includes(type)
+    ? [["novopay_id", "NovoPay ID"], ["full_name", "Member"], ["status", "Status"], ["level", "Level"], ["created_at", "Joined"]]
+    : type === "reports"
+    ? [["name", "Report"], ["value", "Value"]]
+    : type === "referrals"
     ? [["reference", "Reward Ref"], ["referred_user_id", "Member ID"], ["basis_amount", "Package Amount"], ["amount", "Reward"], ["status", "Status"], ["created_at", "Date"]]
     : type === "activations"
     ? [["reference", "Reference"], ["package_name", "Package"], ["amount", "Amount"], ["status", "Status"], ["activated_at", "Activated"]]
