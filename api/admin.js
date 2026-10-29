@@ -114,6 +114,18 @@ export default async function handler(req, res) {
     }
 
     const section = String(req.query?.section || "overview").toLowerCase();
+    if (section === "settings") {
+      await db`CREATE TABLE IF NOT EXISTS system_settings (setting_key text PRIMARY KEY, setting_value jsonb NOT NULL DEFAULT '{}'::jsonb, updated_at timestamptz NOT NULL DEFAULT now(), updated_by text)`;
+      await db`INSERT INTO system_settings(setting_key, setting_value) VALUES ('platform', jsonb_build_object(
+        'maintenanceMode', false, 'enforceWithdrawalTiming', true,
+        'depositAddress', '', 'network', 'BNB Smart Chain (BEP20)', 'asset', 'USDT',
+        'walletLink', '', 'qrImageUrl', '', 'networkNotice', 'Only USDT on BNB Smart Chain (BEP20) is accepted.',
+        'basicPackageVisible', true, 'fdPackageVisible', true, 'depositVisible', true,
+        'brochurePdfUrl', '', 'commissions', jsonb_build_array(5,1,1,1,1,1,1,1,1,1,1,1,0.5,0.5,0.5)
+      )) ON CONFLICT (setting_key) DO NOTHING`;
+      const saved = await db`SELECT setting_value, updated_at FROM system_settings WHERE setting_key='platform' LIMIT 1`;
+      return res.status(200).json({ ok: true, section, settings: saved[0]?.setting_value || {}, updatedAt: saved[0]?.updated_at || null });
+    }
     if (section === "overview") {
       const [counts, recentActivity] = await Promise.all([
         Promise.all([
