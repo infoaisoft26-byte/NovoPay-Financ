@@ -127,24 +127,24 @@ export default async function handler(req, res) {
       const displayName = String(req.body?.full_name || decoded.name || email.split("@")[0] || "Member").trim().slice(0, 120);
       const sponsorCode = String(req.body?.sponsor_code || "").trim().toUpperCase();
       const mobile = String(req.body?.mobile || "").trim();
-      const normalizedMobile = mobile.replace(/\\D/g, "");
+      const normalizedMobile = mobile.replace(/\D/g, "");
       if (!displayName) return res.status(400).json({ error: "Please enter your full name." });
-      if (!/^\\+?[0-9\\s()-]{10,18}$/.test(mobile) || normalizedMobile.length < 10 || normalizedMobile.length > 15) return res.status(400).json({ error: "Please enter a valid mobile number." });
+      if (!/^\+?[0-9\s()-]{10,18}$/.test(mobile) || normalizedMobile.length < 10 || normalizedMobile.length > 15) return res.status(400).json({ error: "Please enter a valid mobile number." });
       if (!sponsorCode) return res.status(400).json({ error: "Referral ID is required to register." });
-      await db\`ALTER TABLE users ADD COLUMN IF NOT EXISTS mobile text\`;
-      await db\`ALTER TABLE users ADD COLUMN IF NOT EXISTS referral_code text\`;
-      await db\`ALTER TABLE users ADD COLUMN IF NOT EXISTS sponsor_user_id text\`;
-      await db\`CREATE UNIQUE INDEX IF NOT EXISTS users_mobile_unique_idx ON users ((regexp_replace(mobile, '[^0-9]', '', 'g'))) WHERE mobile IS NOT NULL AND mobile <> ''\`;
-      await db\`CREATE UNIQUE INDEX IF NOT EXISTS users_referral_code_unique_idx ON users (upper(referral_code)) WHERE referral_code IS NOT NULL AND referral_code <> ''\`;
-      const duplicateMobile = await db\`SELECT novopay_id FROM users WHERE regexp_replace(COALESCE(mobile, ''), '[^0-9]', '', 'g') = ${normalizedMobile} LIMIT 1\`;
+      await db`ALTER TABLE users ADD COLUMN IF NOT EXISTS mobile text`;
+      await db`ALTER TABLE users ADD COLUMN IF NOT EXISTS referral_code text`;
+      await db`ALTER TABLE users ADD COLUMN IF NOT EXISTS sponsor_user_id text`;
+      await db`CREATE UNIQUE INDEX IF NOT EXISTS users_mobile_unique_idx ON users ((regexp_replace(mobile, '[^0-9]', '', 'g'))) WHERE mobile IS NOT NULL AND mobile <> ''`;
+      await db`CREATE UNIQUE INDEX IF NOT EXISTS users_referral_code_unique_idx ON users (upper(referral_code)) WHERE referral_code IS NOT NULL AND referral_code <> ''`;
+      const duplicateMobile = await db`SELECT novopay_id FROM users WHERE regexp_replace(COALESCE(mobile, ''), '[^0-9]', '', 'g') = ${normalizedMobile} LIMIT 1`;
       if (duplicateMobile[0]) return res.status(409).json({ error: "This mobile number is already registered. Please sign in to your existing account." });
       const sponsorRows = sponsorCode === "NA00501" ? [{ novopay_id: "NA00501" }] : await db`SELECT novopay_id FROM users WHERE status = 'active' AND (upper(COALESCE(referral_code, '')) = ${sponsorCode} OR upper(novopay_id) = ${sponsorCode}) LIMIT 1`;
       if (!sponsorRows[0]) return res.status(400).json({ error: "Referral ID is invalid or inactive. Check the ID and try again." });
       const generatedId = "NP" + randomUUID().replace(/-/g, "").slice(0, 18).toUpperCase();
-      await db\`CREATE SEQUENCE IF NOT EXISTS novopay_referral_seq START WITH 502 INCREMENT BY 1\`;
-      const referralRows = await db\`SELECT 'NA' || lpad(nextval('novopay_referral_seq')::text, 5, '0') AS referral_code\`;
+      await db`CREATE SEQUENCE IF NOT EXISTS novopay_referral_seq START WITH 502 INCREMENT BY 1`;
+      const referralRows = await db`SELECT 'NA' || lpad(nextval('novopay_referral_seq')::text, 5, '0') AS referral_code`;
       const generatedReferral = referralRows[0].referral_code;
-      const rows = await db\`INSERT INTO users (auth_uid, novopay_id, referral_code, sponsor_user_id, full_name, email, mobile)
+      const rows = await db`INSERT INTO users (auth_uid, novopay_id, referral_code, sponsor_user_id, full_name, email, mobile)
         VALUES (${decoded.uid}, ${generatedId}, ${generatedReferral}, ${sponsorRows[0].novopay_id}, ${displayName}, ${email}, ${mobile})
         ON CONFLICT (auth_uid) DO UPDATE SET
           full_name = CASE WHEN users.full_name = '' THEN EXCLUDED.full_name ELSE users.full_name END,
@@ -152,7 +152,7 @@ export default async function handler(req, res) {
           mobile = COALESCE(NULLIF(users.mobile, ''), EXCLUDED.mobile),
           referral_code = COALESCE(NULLIF(users.referral_code, ''), EXCLUDED.referral_code),
           updated_at = now()
-        RETURNING id, auth_uid, novopay_id, full_name, email, mobile, status, fund_balance, income_balance, referral_code, sponsor_user_id, created_at\`;
+        RETURNING id, auth_uid, novopay_id, full_name, email, mobile, status, fund_balance, income_balance, referral_code, sponsor_user_id, created_at`;
       return res.status(200).json({ ok: true, user: rows[0] });
     }
 
