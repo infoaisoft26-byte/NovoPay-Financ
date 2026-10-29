@@ -41,6 +41,58 @@ export default async function handler(req, res) {
     const action = String(req.body?.action || "");
     const reference = "NP" + randomUUID().replace(/-/g, "").slice(0, 16).toUpperCase();
 
+    if (action === "p2p-transfer") {
+      const amount = positiveAmount(req.body?.amount);
+      const receiverId = String(req.body?.receiver_id || "").trim().toUpperCase();
+      if (!/^NP[A-Z0-9]{8,30}$/.test(receiverId)) fail("Enter a valid recipient NovoPay ID.");
+      if (receiverId === String(profile.novopay_id).toUpperCase()) fail("You cannot transfer funds to your own account.");
+      const transferRef = "P2P" + randomUUID().replace(/-/g, "").slice(0, 14).toUpperCase();
+      const rows = await sql`WITH target AS MATERIALIZED (
+        SELECT novopay_id FROM users
+        WHERE novopay_id = ${receiverId} AND status = 'active'
+        FOR UPDATE
+      ), moved AS (
+        UPDATE users sender
+        SET fund_balance = sender.fund_balance - ${amount}::numeric, updated_at = now()
+        WHERE sender.novopay_id = ${profile.novopay_id}
+          AND sender.fund_balance >= ${amount}::numeric
+          AND EXISTS (SELECT 1 FROM target)
+        RETURNING sender.novopay_id
+      ), credited AS (
+        UPDATE users receiver
+        SET fund_balance = receiver.fund_balance + ${amount}::numeric, updated_at = now()
+        FROM moved, target
+        WHERE receiver.novopay_id = target.novopay_id
+        RETURNING receiver.novopay_id
+      ), transfer AS (
+        INSERT INTO p2p_transfers (reference, sender_user_id, receiver_user_id, amount, currency, status)
+        SELECT ${transferRef}, moved.novopay_id, credited.novopay_id, ${amount}::numeric, 'USDT', 'completed'
+        FROM moved CROSS JOIN credited
+        RETURNING reference, sender_user_id, receiver_user_id, amount, currency, status, created_at
+      ), sender_ledger AS (
+        INSERT INTO ledger_transactions (reference, user_id, type, amount, currency, status, description, idempotency_key)
+        SELECT ${transferRef + "-S"}, sender_user_id, 'p2p_sent', -amount, currency, 'posted',
+               ${"P2P transfer sent to " + receiverId}, ${"p2p:" + transferRef + ":sender"}
+        FROM transfer RETURNING id
+      ), receiver_ledger AS (
+        INSERT INTO ledger_transactions (reference, user_id, type, amount, currency, status, description, idempotency_key)
+        SELECT ${transferRef + "-R"}, receiver_user_id, 'p2p_received', amount, currency, 'posted',
+               ${"P2P transfer received from " + profile.novopay_id}, ${"p2p:" + transferRef + ":receiver"}
+        FROM transfer RETURNING id
+      ), audited AS (
+        INSERT INTO audit_logs (actor_uid, action, entity_type, entity_id, details)
+        SELECT ${decoded.uid}, 'p2p_transfer', 'p2p_transfer', reference,
+               jsonb_build_object('receiver_user_id', receiver_user_id, 'amount', amount, 'currency', currency)
+        FROM transfer RETURNING id
+      )
+      SELECT transfer.* FROM transfer
+      CROSS JOIN (SELECT count(*) FROM sender_ledger) sender_guard
+      CROSS JOIN (SELECT count(*) FROM receiver_ledger) receiver_guard
+      CROSS JOIN (SELECT count(*) FROM audited) audit_guard`;
+      if (!rows.length) fail("Recipient was not found or Fund Wallet balance is insufficient.", 409);
+      return res.status(201).json({ ok: true, message: "P2P transfer completed successfully.", record: rows[0] });
+    }
+
     if (action === "income-to-fund") {
       const amount = positiveAmount(req.body?.amount);
       const transferRef = "ITF" + randomUUID().replace(/-/g, "").slice(0, 14).toUpperCase();
