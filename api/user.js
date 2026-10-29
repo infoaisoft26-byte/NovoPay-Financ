@@ -126,10 +126,11 @@ export default async function handler(req, res) {
       if (!email) return res.status(400).json({ error: "A verified email address is required." });
       const displayName = String(req.body?.full_name || decoded.name || email.split("@")[0] || "Member").trim().slice(0, 120);
       const sponsorCode = String(req.body?.sponsor_code || "").trim().toUpperCase();
-      const mobile = String(req.body?.mobile || "").trim();
-      const normalizedMobile = mobile.replace(/\D/g, "");
+      const mobileInput = String(req.body?.mobile || "").trim();
+      const normalizedMobile = mobileInput.replace(/\D/g, "");
+      const mobile = normalizedMobile;
       if (!displayName) return res.status(400).json({ error: "Please enter your full name." });
-      if (!/^\+?[0-9\s()-]{10,18}$/.test(mobile) || normalizedMobile.length < 10 || normalizedMobile.length > 15) return res.status(400).json({ error: "Please enter a valid mobile number." });
+      if (normalizedMobile.length < 10 || normalizedMobile.length > 15) return res.status(400).json({ error: "Enter 10-digit mobile number, or include country code such as +91." });
       if (!sponsorCode) return res.status(400).json({ error: "Referral ID is required to register." });
       await db`ALTER TABLE users ADD COLUMN IF NOT EXISTS mobile text`;
       await db`ALTER TABLE users ADD COLUMN IF NOT EXISTS referral_code text`;
