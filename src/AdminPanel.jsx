@@ -135,6 +135,7 @@ export default function AdminPanel({ user, onLogout }) {
   const [dataError, setDataError] = useState("");
   const [loadingData, setLoadingData] = useState(false);
   const [settingUpAdmin, setSettingUpAdmin] = useState(false);
+  const [actionBusy, setActionBusy] = useState("");
   const [reloadKey, setReloadKey] = useState(0);
   const sections = useMemo(() => navGroups.flatMap(g => g.items), []);
   const active = sections.find(x => x.label === section) || { icon: LayoutDashboard };
@@ -194,6 +195,50 @@ export default function AdminPanel({ user, onLogout }) {
     const interval = window.setInterval(() => setReloadKey(value => value + 1), 15000);
     return () => window.clearInterval(interval);
   }, []);
+
+  async function runAdminAction(action, row, label) {
+    const key = action + ":" + (row.reference || row.id || row.novopay_id || "");
+    if (actionBusy) return;
+    const confirmText = label === "Approve deposit" ? "Approve this deposit and credit the user's NovoPay fund wallet?" :
+      label === "Reject withdrawal" ? "Reject this withdrawal and refund its amount to the user's fund wallet?" :
+      label === "Suspend user" ? "Suspend this user's NovoPay account?" :
+      label === "Activate package" ? "Make this package available to users?" :
+      label === "Pause package" ? "Pause this package for new activations?" : label + "?";
+    if (!window.confirm(confirmText)) return;
+    setActionBusy(key); setDataError(""); setNotice("");
+    try {
+      const token = await user.getIdToken();
+      const response = await fetch("/api/admin-actions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: "Bearer " + token },
+        body: JSON.stringify({ action, reference: row.reference, id: row.id || row.novopay_id, status: action.endsWith("-status") ? (label.toLowerCase().includes("approve") ? "approved" : label.toLowerCase().includes("reject") ? "rejected" : label.toLowerCase().includes("suspend") ? "suspended" : label.toLowerCase().includes("activate") ? "active" : label.toLowerCase().includes("pause") ? "paused" : label.toLowerCase().includes("close") ? "closed" : label.toLowerCase().includes("resolve") ? "resolved" : "active") : undefined })
+      });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(payload.error || "Admin action could not be completed.");
+      setNotice(label + " completed successfully.");
+      setReloadKey(value => value + 1);
+    } catch (error) {
+      setDataError(error.message || "Admin action could not be completed.");
+    } finally { setActionBusy(""); }
+  }
+
+  function rowActions(row) {
+    const actions = [];
+    if (section === "Deposits" && row.status === "pending") {
+      actions.push(["deposit-approve", "Approve deposit", "success"], ["deposit-reject", "Reject deposit", "danger"]);
+    } else if (section === "Withdrawals" && row.status === "pending") {
+      actions.push(["withdrawal-approve", "Approve withdrawal", "success"], ["withdrawal-reject", "Reject withdrawal", "danger"]);
+    } else if (section === "KYC Approvals" && row.status === "pending") {
+      actions.push(["kyc-status", "Approve KYC", "success"], ["kyc-status", "Reject KYC", "danger"]);
+    } else if (section === "Users") {
+      actions.push(["user-status", row.status === "suspended" ? "Activate user" : "Suspend user", row.status === "suspended" ? "success" : "danger"]);
+    } else if (section === "Support Tickets" && !["closed", "resolved"].includes(row.status)) {
+      actions.push(["support-status", "Resolve ticket", "success"], ["support-status", "Close ticket", "danger"]);
+    } else if (section === "Packages") {
+      actions.push(["package-status", row.status === "active" ? "Pause package" : "Activate package", row.status === "active" ? "danger" : "success"]);
+    }
+    return actions;
+  }
 
   const quickLinks = [
     { label: "Manage users", desc: "Accounts and wallet summaries", icon: Users, target: "Users" },
@@ -286,7 +331,7 @@ export default function AdminPanel({ user, onLogout }) {
             </div>
             <div className="np-admin-table-head">{(tableColumns[section] || ["RECORD", "STATUS", "DETAILS"]).map(col => <span key={col}>{col}</span>)}</div>
             {dataError && <div className="np-admin-inline-error" role="status"><ShieldAlert size={17}/><span>{dataError}</span></div>}
-            {loadingData ? <div className="np-admin-empty np-admin-section-empty"><RefreshCw size={22}/><b>Loading NovoPay records…</b><p>Reading from the authenticated admin API.</p></div> : rows.length ? <div className="np-admin-record-list">{rows.map((row, index) => <div className="np-admin-record-row" key={row.id || row.reference || index}>{recordCells(section, row).map((cell, cellIndex) => <span key={cellIndex} title={String(cell ?? "")}>{cell == null || cell === "" ? "—" : String(cell)}</span>)}</div>)}</div> : <div className="np-admin-empty np-admin-section-empty"><span className="np-admin-empty-icon"><ActiveIcon size={22}/></span><b>{dataError ? "Records unavailable" : emptyTitles[section] || "No records available"}</b><p>{dataError ? "Resolve the backend configuration or admin permission message above, then refresh." : query ? "No records matched this search." : "No records exist in this section yet. No sample financial records are invented."}</p></div>}
+            {loadingData ? <div className="np-admin-empty np-admin-section-empty"><RefreshCw size={22}/><b>Loading NovoPay records…</b><p>Reading from the authenticated admin API.</p></div> : rows.length ? <div className="np-admin-record-list">{rows.map((row, index) => <div className={`np-admin-record-row ${rowActions(row).length ? "has-actions" : ""}`} key={row.id || row.reference || index}>{recordCells(section, row).map((cell, cellIndex) => <span key={cellIndex} title={String(cell ?? "")}>{cell == null || cell === "" ? "—" : String(cell)}</span>)}{rowActions(row).length > 0 && <div className="np-admin-row-actions">{rowActions(row).map(([action, label, kind]) => <button key={action + label} className={`np-admin-action-button ${kind}`} disabled={!!actionBusy} onClick={() => runAdminAction(action, row, label)}>{actionBusy === action + ":" + (row.reference || row.id || row.novopay_id || "") ? "Working…" : label}</button>)}</div>}</div>)}</div> : <div className="np-admin-empty np-admin-section-empty"><span className="np-admin-empty-icon"><ActiveIcon size={22}/></span><b>{dataError ? "Records unavailable" : emptyTitles[section] || "No records available"}</b><p>{dataError ? "Resolve the backend configuration or admin permission message above, then refresh." : query ? "No records matched this search." : "No records exist in this section yet. No sample financial records are invented."}</p></div>}
           </section>}
           <footer className="np-admin-footer"><span>© {new Date().getFullYear()} NovoPay Finance</span><span><ShieldCheck size={14}/> Independent admin workspace</span>{lastRefresh && <span>Refresh requested at {lastRefresh}</span>}</footer>
         </div>
