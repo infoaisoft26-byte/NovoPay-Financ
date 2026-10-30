@@ -7,6 +7,7 @@ import {
   Menu, Package, RefreshCw, Search, ShieldCheck, UserRound, Wallet, X
 } from "lucide-react";
 import "./user-dashboard.css";
+import QRCode from "qrcode";
 
 
 const makeQrUrl = (value, size = 240) => value ? `https://api.qrserver.com/v1/create-qr-code/?size=${size}x${size}&margin=10&data=${encodeURIComponent(value)}` : "";
@@ -118,6 +119,7 @@ export default function UserDashboard({ user, onLogout }) {
   const previousDepositStatuses = useRef(null);
   const [depositAmount, setDepositAmount] = useState("2");
   const [txHash, setTxHash] = useState("");
+  const [generatedQr, setGeneratedQr] = useState("");
   const [withdrawAmount, setWithdrawAmount] = useState("");
   const [payoutAddress, setPayoutAddress] = useState("");
   const [p2pRecipient, setP2pRecipient] = useState("");
@@ -126,6 +128,16 @@ export default function UserDashboard({ user, onLogout }) {
   const [newEmail, setNewEmail] = useState("");
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
+
+  useEffect(() => {
+    let active = true;
+    const address = String(data?.depositAddress || "").trim();
+    if (!address) { setGeneratedQr(""); return () => { active = false; }; }
+    QRCode.toDataURL(address, { width: 300, margin: 2, errorCorrectionLevel: "M" })
+      .then(url => { if (active) setGeneratedQr(url); })
+      .catch(() => { if (active) setGeneratedQr(""); });
+    return () => { active = false; };
+  }, [data?.depositAddress]);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -418,7 +430,7 @@ export default function UserDashboard({ user, onLogout }) {
 
           {!error && section === "wallet" && <><div className="np-user-stats"><Stat icon={Wallet} label="Fund Wallet" value={profile ? money(profile.fund_balance) : "—"} tone="blue" /><Stat icon={Activity} label="Income Wallet" value={profile ? money(profile.income_balance) : "—"} tone="green" /></div><section className="np-user-panel"><PanelTitle title="Wallet ledger" subtitle="Verified wallet entries" /><Records rows={rows} type="transactions" loading={loading} /></section></>}
           {!error && section === "deposits" && <section className="np-user-panel">{data?.platformSettings?.depositVisible === false ? <><PanelTitle title="USDT Recharge Wallet" subtitle="Deposits are temporarily unavailable." /><p role="status">Please check back later or contact support.</p></> : <><PanelTitle title="USDT Recharge Wallet" subtitle={data?.platformSettings?.networkNotice || "Network: BNB Smart Chain (BEP-20). Send USDT only on this network."} />
-            {data?.depositAddress && <div className="np-user-deposit-qr"><img src={data?.platformSettings?.qrImageUrl || makeQrUrl(data.depositAddress, 260)} alt="USDT BEP20 deposit QR code" onError={e=>{if(!e.currentTarget.dataset.qrFallback){e.currentTarget.dataset.qrFallback="1";e.currentTarget.src=makeQrUrl(data.depositAddress,260)}else{e.currentTarget.style.display="none"}}} style={{maxWidth:240,width:"100%",height:"auto",display:"block",margin:"0 auto 16px",background:"#fff",padding:10,borderRadius:12}}/><small>Scan to copy the USDT BEP-20 deposit wallet address.</small></div>}
+            {data?.depositAddress && <div className="np-user-deposit-qr"><img src={data?.platformSettings?.qrImageUrl || generatedQr || makeQrUrl(data.depositAddress, 260)} alt="USDT BEP20 deposit QR code" onError={e=>{if(generatedQr && e.currentTarget.src !== generatedQr){e.currentTarget.src=generatedQr;return;}e.currentTarget.style.display="none";}} style={{maxWidth:240,width:"100%",height:"auto",display:"block",margin:"0 auto 16px",background:"#fff",padding:10,borderRadius:12}}/><small>Scan to copy the USDT BEP-20 deposit wallet address.</small></div>}
             <div className="np-user-deposit-address-card"><div><b>USDT deposit address</b><p>{data?.depositAddress || "Deposit address is temporarily unavailable. Please check back later."}</p><small>Network: BSC / BEP-20 · Token: USDT</small></div><button type="button" disabled={!data?.depositAddress} onClick={async () => { try { await navigator.clipboard.writeText(data.depositAddress); setActionMessage("Deposit wallet address copied."); } catch { setActionMessage("Please select and copy the wallet address."); } }}><Copy size={15}/> Copy address</button></div>
             {data?.platformSettings?.walletLink && <p><a href={data.platformSettings.walletLink} target="_blank" rel="noreferrer">Open deposit wallet</a></p>}
             {actionMessage && <p role="status">{actionMessage}</p>}
