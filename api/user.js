@@ -81,7 +81,7 @@ async function authenticatedUser(req, auth) {
 }
 
 async function getProfile(db, uid) {
-  const rows = await db`SELECT id, auth_uid, novopay_id, full_name, email, mobile, status, fund_balance, income_balance, referral_code, sponsor_user_id, created_at FROM users WHERE auth_uid = ${uid} LIMIT 1`;
+  const rows = await db`SELECT id, auth_uid, novopay_id, full_name, email, mobile, status, fund_balance, income_balance, COALESCE(novopay_id, referral_code) AS referral_code, sponsor_user_id, created_at FROM users WHERE auth_uid = ${uid} LIMIT 1`;
   return rows[0] || null;
 }
 
