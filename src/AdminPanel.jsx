@@ -26,6 +26,8 @@ const navGroups = [
     { label: "Package Activations", icon: PackageCheck },
     { label: "Reports", icon: ChartNoAxesCombined },
     { label: "Income Reports", icon: Activity },
+    { label: "Daily Income Report", icon: FileText },
+    { label: "Monthly Income Report", icon: FileText },
     { label: "Income Leaderboard", icon: Trophy },
   ]},
   { title: "OPERATIONS & SECURITY", items: [
@@ -51,6 +53,8 @@ const descriptions = {
   Reports: "Review platform, transaction and finance summaries.",
   "Income Leaderboard": "Rank eligible accounts using verified NovoPay records.",
   "Income Reports": "Platform-wide income and ledger report across all members, categories and statuses.",
+  "Daily Income Report": "Date-wise posted income grouped by category using India Standard Time.",
+  "Monthly Income Report": "Month-wise posted income grouped by category using India Standard Time.",
   "Support Tickets": "Manage customer questions and support status.",
   "Website Feedback": "Review submitted product feedback.",
   "Survey Responses": "Review user survey submissions.",
@@ -83,7 +87,7 @@ const sectionSlugs = {
   Withdrawals: "withdrawals", Transactions: "transactions", "P2P Transfers": "p2p",
   Packages: "packages", "Package Activations": "activations", "Support Tickets": "support",
   "Website Feedback": "feedback", "Survey Responses": "surveys", "Audit Logs": "audit", "Offer Posters": "posters",
-  Reports: "reports", "Income Reports": "income-reports", "Income Leaderboard": "leaderboard", Settings: "settings",
+  Reports: "reports", "Income Reports": "income-reports", "Daily Income Report": "daily-income-report", "Monthly Income Report": "monthly-income-report", "Income Leaderboard": "leaderboard", Settings: "settings",
 };
 
 function recordCells(section, row) {
@@ -104,8 +108,10 @@ function recordCells(section, row) {
     case "Audit Logs": return [row.id || "—", row.actor_uid || "System", row.action || "—", (row.entity_type || "record") + " · " + (row.entity_id || "—"), stamp(row.created_at)];
     case "Offer Posters": return [row.id || "—", row.title || "—", row.status || "draft", row.image_url || "—", stamp(row.updated_at || row.created_at)];
     case "Reports": return [row.name || "Report", row.status || "—", row.details || "—", stamp(row.updated_at || row.created_at), row.id || "—"];
-    case "Income Reports": return [row.user_id || "—", row.full_name || "Member", row.income_category || row.type || "Income", amount(row.amount, row.currency), (row.status || "—") + " · " + stamp(row.created_at)];
-    case "Income Leaderboard": return [row.rank == null ? "—" : "#" + row.rank, row.novopay_id || "—", row.full_name || "Member", amount(row.total_investment), "Level " + (row.level || "—") + " · Direct " + (row.direct_members ?? "—")];
+    case "Daily Income Report":
+    case "Monthly Income Report": return [row.period || "—", row.income_category || "—", amount(row.total_amount), row.entries ?? 0];
+    case "Income Reports": return [row.user_id || "—", row.full_name || "Member", row.income_category || row.type || "Income", row.source_member_id || "—", row.source_member_name || "—", row.referral_level ? "L" + row.referral_level : "—", row.referral_rate == null ? "—" : row.referral_rate + "%", amount(row.basis_amount), amount(row.amount, row.currency), (row.status || "—") + " · " + stamp(row.created_at)];
+    case "Income Leaderboard": return [row.rank == null ? "—" : "#" + row.rank, row.novopay_id || "—", row.full_name || "Member", amount(row.total_investment), String(row.direct_members ?? 0), String(row.team_count ?? 0), [1,2,3,4,5,6,7,8,9,10,11,12,13,14,15].map(level => "L" + level + ": " + (row["level_" + level] ?? 0)).join(" · ")];
     case "Settings": return [row.name || "Setting", row.status || "—", row.details || "—", stamp(row.updated_at), row.id || "—"];
     default: return [row.id || row.reference || "—", row.user_id || "—", row.type || row.name || "Record", row.status || "—", stamp(row.created_at || row.updated_at)];
   }
@@ -121,8 +127,10 @@ const tableColumns = {
   Packages: ["PACKAGE NAME", "TYPE", "PRICE", "ROI / DURATION", "STATUS"],
   "Package Activations": ["ACTIVATION REF", "USER ID", "PACKAGE", "AMOUNT", "STATUS"],
   Reports: ["REPORT", "STATUS", "SUMMARY", "UPDATED", "RECORD ID"],
-  "Income Reports": ["USER ID", "MEMBER", "INCOME TYPE", "AMOUNT", "STATUS / DATE"],
-  "Income Leaderboard": ["RANK", "NOVOPAY ID", "MEMBER", "TOTAL INVESTMENT", "LEVEL / TEAM"],
+  "Income Reports": ["USER ID", "MEMBER", "INCOME TYPE", "SOURCE MEMBER ID", "SOURCE MEMBER", "LEVEL", "RATE", "BASIS", "INCOME", "STATUS / DATE"],
+  "Daily Income Report": ["DATE (IST)", "INCOME CATEGORY", "TOTAL CREDITED", "ENTRIES"],
+  "Monthly Income Report": ["MONTH (IST)", "INCOME CATEGORY", "TOTAL CREDITED", "ENTRIES"],
+  "Income Leaderboard": ["RANK", "NOVOPAY ID", "MEMBER", "TOTAL INVESTMENT", "DIRECTS", "TOTAL TEAM", "LEVEL-WISE TEAM (L1–L15)"],
   "Support Tickets": ["TICKET REF", "USER ID", "SUBJECT", "STATUS", "LAST UPDATED"],
   "Website Feedback": ["FEEDBACK ID", "USER", "RATING", "MESSAGE", "SUBMITTED"],
   "Survey Responses": ["RESPONSE ID", "USER ID", "SURVEY", "STATUS", "RESPONSE DETAILS"],
@@ -441,7 +449,7 @@ export default function AdminPanel({ user, onLogout }) {
                 <label className="np-admin-toggle-row"><span><b>Basic Package</b><small>{platformSettings.basicPackageVisible ? "LIVE / Visible to users" : "HIDDEN"}</small></span><input type="checkbox" checked={!!platformSettings.basicPackageVisible} onChange={e=>setPlatformSettings(v=>({...v,basicPackageVisible:e.target.checked}))}/></label>
                 <label className="np-admin-toggle-row"><span><b>FD Package</b><small>{platformSettings.fdPackageVisible ? "LIVE / Visible to users" : "HIDDEN"}</small></span><input type="checkbox" checked={!!platformSettings.fdPackageVisible} onChange={e=>setPlatformSettings(v=>({...v,fdPackageVisible:e.target.checked}))}/></label>
               </section>
-              <section className="np-admin-settings-card"><h3>Brochure PDF</h3><p>Set the public URL of the current NovoPay brochure PDF.</p><label>Brochure PDF URL<input value={platformSettings.brochurePdfUrl || ""} placeholder="https://…" onChange={e=>setPlatformSettings(v=>({...v,brochurePdfUrl:e.target.value}))}/></label></section>
+              <section className="np-admin-settings-card"><h3>Brochure PDF</h3><p>Upload a PDF brochure (up to 750 KB) or paste a public PDF link.</p><label>Upload brochure PDF<input type="file" accept="application/pdf,.pdf" onChange={e=>{const file=e.target.files?.[0];if(!file)return;if(file.type!=="application/pdf"&&!file.name.toLowerCase().endsWith(".pdf")){setDataError("Please choose a PDF file.");e.target.value="";return;}if(file.size>750*1024){setDataError("Brochure must be 750 KB or smaller.");e.target.value="";return;}const reader=new FileReader();reader.onload=()=>setPlatformSettings(v=>({...v,brochurePdfUrl:String(reader.result||"")}));reader.onerror=()=>setDataError("The brochure file could not be read.");reader.readAsDataURL(file);}}/></label><label>Or public brochure PDF URL<input value={String(platformSettings.brochurePdfUrl||"").startsWith("data:")?"":platformSettings.brochurePdfUrl||""} placeholder="https://…" onChange={e=>setPlatformSettings(v=>({...v,brochurePdfUrl:e.target.value}))}/></label>{platformSettings.brochurePdfUrl&&<p><b>Brochure ready:</b> {String(platformSettings.brochurePdfUrl).startsWith("data:")?"Uploaded PDF":"PDF link saved"}</p>}</section>
               <section className="np-admin-settings-card"><h3>Level Commission Settings (L1–L15)</h3><p>Percent of eligible joining/re-topup amount or daily ROI, according to the configured income rules. Changes apply to future settlements only; past credits and wallet balances are not changed.</p>
                 <div className="np-admin-commission-grid">{platformSettings.commissions.map((rate,index)=><label key={index}>Level {index+1} (%)<input type="number" min="0" max="100" step="0.1" value={rate} onChange={e=>updateCommission(index,e.target.value === "" ? "" : Number(e.target.value))}/></label>)}</div>
               </section>

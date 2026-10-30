@@ -261,3 +261,16 @@ html,body,#root{width:100%;min-width:0;max-width:100%;margin:0}
 .np-user-deposit-qr small{color:#64748b;font-size:11px;line-height:1.5}
 .np-admin-qr-preview{flex-wrap:wrap;min-height:136px}
 .np-admin-qr-preview img{flex:0 0 110px;min-width:110px;min-height:110px}
+
+
+/* Readable, confident member dashboard typography and restrained motion */
+.np-user-shell,.np-user-shell *{font-weight:500}
+.np-user-shell h1,.np-user-shell h2,.np-user-shell h3,.np-user-stat strong,.np-user-welcome-card h2,.np-user-panel-title h2,.np-user-table td:first-child,.np-user-profile-field b{font-weight:800!important}
+.np-user-shell{font-family:Inter,Manrope,system-ui,sans-serif;font-size:14px;line-height:1.55}
+.np-user-shell .np-user-panel,.np-user-shell .np-user-stat,.np-user-shell .np-user-welcome-card{animation:npUserRise .42s ease both}
+.np-user-shell .np-user-stat:nth-child(2){animation-delay:.04s}.np-user-shell .np-user-stat:nth-child(3){animation-delay:.08s}.np-user-shell .np-user-stat:nth-child(4){animation-delay:.12s}.np-user-shell .np-user-stat:nth-child(5){animation-delay:.16s}
+.np-user-shell button,.np-user-shell a{transition:transform .18s ease,box-shadow .18s ease,background-color .18s ease}
+.np-user-shell button:hover,.np-user-shell a:hover{transform:translateY(-1px)}
+.np-user-shell .np-user-stat:hover,.np-user-shell .np-user-panel:hover{box-shadow:0 12px 30px rgba(22,38,65,.08)}
+@keyframes npUserRise{from{opacity:0;transform:translateY(9px)}to{opacity:1;transform:translateY(0)}}
+@media(prefers-reduced-motion:reduce){.np-user-shell *{animation:none!important;transition:none!important;scroll-behavior:auto!important}}

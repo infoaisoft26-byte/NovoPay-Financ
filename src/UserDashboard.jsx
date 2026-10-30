@@ -7,6 +7,7 @@ import {
   Menu, Package, RefreshCw, Search, ShieldCheck, UserRound, Wallet, X
 } from "lucide-react";
 import "./user-dashboard.css";
+import QRCode from "qrcode";
 
 
 const makeQrUrl = (value, size = 240) => value ? `https://api.qrserver.com/v1/create-qr-code/?size=${size}x${size}&margin=10&data=${encodeURIComponent(value)}` : "";
@@ -42,6 +43,8 @@ const NAV_GROUPS = [
     { id: "fd-level", label: "FD Level Income", icon: Users },
     { id: "rd-level", label: "RD Level Income", icon: Users },
     { id: "salary", label: "Salary Income", icon: CreditCard },
+    { id: "daily-income-report", label: "Daily Income Report", icon: FileText },
+    { id: "monthly-income-report", label: "Monthly Income Report", icon: FileText },
   ]},
   { title: "REPORTS & SUPPORT", items: [
     { id: "reports", label: "Reports", icon: FileText },
@@ -77,6 +80,8 @@ const TITLES = {
   "fd-level": ["FD Level Income", "FD level income entries from your ledger."],
   "rd-level": ["RD Level Income", "RD level income entries from your ledger."],
   salary: ["Salary Income", "Salary entries recorded in your ledger."],
+  "daily-income-report": ["Daily Income Report", "Date-wise credited income, grouped by category (IST)."],
+  "monthly-income-report": ["Monthly Income Report", "Month-wise credited income, grouped by category (IST)."],
   reports: ["Reports", "Summary of your own account activity."],
   support: ["Support Tickets", "Track support requests linked to your account."],
   profile: ["My Profile", "Your registered account details."],
@@ -114,6 +119,7 @@ export default function UserDashboard({ user, onLogout }) {
   const previousDepositStatuses = useRef(null);
   const [depositAmount, setDepositAmount] = useState("2");
   const [txHash, setTxHash] = useState("");
+  const [generatedQr, setGeneratedQr] = useState("");
   const [withdrawAmount, setWithdrawAmount] = useState("");
   const [payoutAddress, setPayoutAddress] = useState("");
   const [p2pRecipient, setP2pRecipient] = useState("");
@@ -122,6 +128,16 @@ export default function UserDashboard({ user, onLogout }) {
   const [newEmail, setNewEmail] = useState("");
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
+
+  useEffect(() => {
+    let active = true;
+    const address = String(data?.depositAddress || "").trim();
+    if (!address) { setGeneratedQr(""); return () => { active = false; }; }
+    QRCode.toDataURL(address, { width: 300, margin: 2, errorCorrectionLevel: "M" })
+      .then(url => { if (active) setGeneratedQr(url); })
+      .catch(() => { if (active) setGeneratedQr(""); });
+    return () => { active = false; };
+  }, [data?.depositAddress]);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -399,7 +415,7 @@ export default function UserDashboard({ user, onLogout }) {
               </section>
               <section className="np-user-panel np-user-level-income">
                 <PanelTitle title="Level-wise Income Details" subtitle="Actual credited amounts from your income ledger. Levels with no matching credited entry show 0.00." />
-                <LevelIncome title="ROI Level Income" rate="L1 5% · L2–L15 1%" values={data?.levelIncome?.roi || {}} />
+                <LevelIncome title="ROI Level Income" rate="L1 7% · L2–L15 1%" values={data?.levelIncome?.roi || {}} />
                 <LevelIncome title="Joining / First Deposit Level Income" rate="L1 5% · L2–L15 0.25%" values={data?.levelIncome?.joining || {}} />
                 <LevelIncome title="Retopup Income" rate="L1 1% · L2–L15 0.25%" values={data?.levelIncome?.retopup || {}} />
                 <p className="np-user-income-note">Rates show the configured schedule, not a guaranteed return. Credits appear here only after they are recorded in the ledger.</p>
@@ -414,14 +430,14 @@ export default function UserDashboard({ user, onLogout }) {
 
           {!error && section === "wallet" && <><div className="np-user-stats"><Stat icon={Wallet} label="Fund Wallet" value={profile ? money(profile.fund_balance) : "—"} tone="blue" /><Stat icon={Activity} label="Income Wallet" value={profile ? money(profile.income_balance) : "—"} tone="green" /></div><section className="np-user-panel"><PanelTitle title="Wallet ledger" subtitle="Verified wallet entries" /><Records rows={rows} type="transactions" loading={loading} /></section></>}
           {!error && section === "deposits" && <section className="np-user-panel">{data?.platformSettings?.depositVisible === false ? <><PanelTitle title="USDT Recharge Wallet" subtitle="Deposits are temporarily unavailable." /><p role="status">Please check back later or contact support.</p></> : <><PanelTitle title="USDT Recharge Wallet" subtitle={data?.platformSettings?.networkNotice || "Network: BNB Smart Chain (BEP-20). Send USDT only on this network."} />
-            {data?.depositAddress && <div className="np-user-deposit-qr"><img src={data?.platformSettings?.qrImageUrl || makeQrUrl(data.depositAddress, 260)} alt="USDT BEP20 deposit QR code" onError={e=>{if(!e.currentTarget.dataset.qrFallback){e.currentTarget.dataset.qrFallback="1";e.currentTarget.src=makeQrUrl(data.depositAddress,260)}else{e.currentTarget.style.display="none"}}} style={{maxWidth:240,width:"100%",height:"auto",display:"block",margin:"0 auto 16px",background:"#fff",padding:10,borderRadius:12}}/><small>Scan to copy the USDT BEP-20 deposit wallet address.</small></div>}
+            {data?.depositAddress && <div className="np-user-deposit-qr"><img src={generatedQr || makeQrUrl(data.depositAddress, 260)} alt="USDT BEP20 deposit QR code" onError={e=>{if(generatedQr && e.currentTarget.src !== generatedQr){e.currentTarget.src=generatedQr;return;}e.currentTarget.style.display="none";}} style={{maxWidth:240,width:"100%",height:"auto",display:"block",margin:"0 auto 16px",background:"#fff",padding:10,borderRadius:12}}/><small>Scan to copy the USDT BEP-20 deposit wallet address.</small></div>}
             <div className="np-user-deposit-address-card"><div><b>USDT deposit address</b><p>{data?.depositAddress || "Deposit address is temporarily unavailable. Please check back later."}</p><small>Network: BSC / BEP-20 · Token: USDT</small></div><button type="button" disabled={!data?.depositAddress} onClick={async () => { try { await navigator.clipboard.writeText(data.depositAddress); setActionMessage("Deposit wallet address copied."); } catch { setActionMessage("Please select and copy the wallet address."); } }}><Copy size={15}/> Copy address</button></div>
             {data?.platformSettings?.walletLink && <p><a href={data.platformSettings.walletLink} target="_blank" rel="noreferrer">Open deposit wallet</a></p>}
             {actionMessage && <p role="status">{actionMessage}</p>}
             <PanelTitle title="Submit deposit transaction" subtitle="Submit your BSC transaction hash; funds are credited only after verification." /><form className="np-user-action-form" onSubmit={e => { e.preventDefault(); submitAction("deposit-request", { amount: depositAmount, tx_hash: txHash }); }}><label>Amount (USDT)<input type="number" min="2" step="0.00000001" required value={depositAmount} onChange={e => setDepositAmount(e.target.value)} /></label><label>BSC transaction hash<input required minLength={64} maxLength={66} value={txHash} onChange={e => setTxHash(e.target.value.trim())} placeholder="0x…" /></label><button disabled={actionBusy}>{actionBusy ? "Submitting…" : "Submit deposit request"}</button>{actionMessage && <p role="status">{actionMessage}</p>}</form><div className="np-user-table-toolbar"><PanelTitle title="Deposit history" subtitle="Your submitted requests" /><label className="np-user-search"><Search size={16} /><input value={query} onChange={e => setQuery(e.target.value)} placeholder="Search records…" /></label></div><Records rows={rows} type={section} loading={loading} /></>}</section>}
           {!error && section === "withdrawals" && <section className="np-user-panel"><PanelTitle title="Request a withdrawal" subtitle="5% service fee; payout is reviewed by admin. Confirm your address carefully." /><form className="np-user-action-form" onSubmit={e => { e.preventDefault(); submitAction("withdrawal-request", { amount: withdrawAmount, payout_address: payoutAddress }); }}><label>Amount (USDT)<input type="number" min="2" step="0.00000001" required value={withdrawAmount} onChange={e => setWithdrawAmount(e.target.value)} /></label><label>BSC payout address<input required pattern="0x[a-fA-F0-9]{40}" value={payoutAddress} onChange={e => setPayoutAddress(e.target.value.trim())} placeholder="0x…" /></label><button disabled={actionBusy}>{actionBusy ? "Submitting…" : "Request withdrawal"}</button>{actionMessage && <p role="status">{actionMessage}</p>}</form><div className="np-user-table-toolbar"><PanelTitle title="Withdrawal history" subtitle="Your submitted requests" /><label className="np-user-search"><Search size={16} /><input value={query} onChange={e => setQuery(e.target.value)} placeholder="Search records…" /></label></div><Records rows={rows} type={section} loading={loading} /></section>}
           {!error && section === "p2p" && <section className="np-user-panel"><PanelTitle title="P2P Transfer" subtitle="Send USDT from your Fund Wallet to another active NovoPay member." /><form className="np-user-action-form" onSubmit={e => { e.preventDefault(); submitAction("p2p-transfer", { receiver_id: p2pRecipient.trim().toUpperCase(), amount: p2pAmount }); }}><label>Recipient NovoPay ID<input required minLength={10} maxLength={32} value={p2pRecipient} onChange={e => setP2pRecipient(e.target.value.toUpperCase())} placeholder="NP…" /></label><label>Amount (USDT)<input type="number" min="0.00000001" step="0.00000001" required value={p2pAmount} onChange={e => setP2pAmount(e.target.value)} /></label><button disabled={actionBusy || !profile || Number(profile.fund_balance || 0) <= 0}>{actionBusy ? "Processing…" : "Send USDT"}</button>{actionMessage && <p role="status">{actionMessage}</p>}</form><div className="np-user-table-toolbar"><PanelTitle title="P2P transfer history" subtitle="Sent and received transfers" /><label className="np-user-search"><Search size={16} /><input value={query} onChange={e => setQuery(e.target.value)} placeholder="Search records…" /></label></div><Records rows={rows} type="p2p" loading={loading} /></section>}
-          {!error && ["transactions", "income-all", "basic-roi", "basic-referral", "basic-level", "fd-roi", "fd-referral", "fd-level", "rd-level", "salary", "direct-team", "team-list", "package-requests", "reports"].includes(section) && <section className="np-user-panel np-user-table-panel"><div className="np-user-table-toolbar"><PanelTitle title={title[0]} subtitle="Records returned for your account" />{["reports", "income-all", "basic-roi", "basic-referral", "basic-level", "fd-roi", "fd-referral", "fd-level", "rd-level", "salary", "transactions"].includes(section) && <button type="button" className="np-user-refresh" onClick={() => window.print()}><Download size={15}/> Download PDF</button>}<label className="np-user-search"><Search size={16} /><input value={query} onChange={e => setQuery(e.target.value)} placeholder="Search records…" /></label></div><Records rows={rows} type={section} loading={loading} /></section>}
+          {!error && ["transactions", "income-all", "basic-roi", "basic-referral", "basic-level", "fd-roi", "fd-referral", "fd-level", "rd-level", "salary", "daily-income-report", "monthly-income-report", "direct-team", "team-list", "package-requests", "reports"].includes(section) && <section className="np-user-panel np-user-table-panel"><div className="np-user-table-toolbar"><PanelTitle title={title[0]} subtitle="Records returned for your account" />{["reports", "income-all", "basic-roi", "basic-referral", "basic-level", "fd-roi", "fd-referral", "fd-level", "rd-level", "salary", "daily-income-report", "monthly-income-report", "transactions"].includes(section) && <button type="button" className="np-user-refresh" onClick={() => window.print()}><Download size={15}/> Download PDF</button>}<label className="np-user-search"><Search size={16} /><input value={query} onChange={e => setQuery(e.target.value)} placeholder="Search records…" /></label></div><Records rows={rows} type={section} loading={loading} /></section>}
           {!error && ["packages", "basic-package", "fd-package"].includes(section) && <>
             {section === "packages" && <section className="np-user-panel"><PanelTitle title="My package activations" subtitle="Your package purchases and activation status" /><Records rows={data?.activations || []} type="activations" loading={loading} /></section>}
             {section === "basic-package" && <section className="np-basic-activation">
@@ -524,6 +540,8 @@ function Records({ rows, type, loading }) {
     columns = [["novopay_id", "NovoPay ID"], ["full_name", "Member"], ["email", "Email"], ["status", "Status"], ["level", "Level"], ["created_at", "Joined"]];
   } else if (type === "reports") {
     columns = [["name", "Report"], ["value", "Value"]];
+  } else if (["daily-income-report", "monthly-income-report"].includes(type)) {
+    columns = [["period", "Date / Month (IST)"], ["income_category", "Income Category"], ["total_amount", "Credited Income (USDT)"], ["entries", "Entries"]];
   } else if (type === "referrals") {
     columns = [["created_at", "Date & Time"], ["referred_user_id", "Source Member ID"], ["reference", "Income Ref"], ["basis_amount", "Package Amount"], ["rate", "Rate"], ["amount", "Income (USDT)"], ["status", "Status"]];
   } else if (type === "activations") {
@@ -537,19 +555,20 @@ function Records({ rows, type, loading }) {
   } else if (type === "p2p") {
     columns = [["created_at", "Date & Time"], ["reference", "Transfer Ref"], ["sender_user_id", "Sender ID"], ["receiver_user_id", "Recipient ID"], ["amount", "Amount (USDT)"], ["status", "Status"]];
   } else if (incomeSections.includes(type)) {
-    columns = [["created_at", "Date & Time"], ["source_member_id", "Source Member ID"], ["type", "Income Type"], ["description", "Income Description"], ["amount", "Amount (USDT)"], ["status", "Status"]];
+    columns = [["created_at", "Date & Time"], ["source_member_id", "Source Member ID"], ["source_member_name", "Source Member"], ["referral_level", "Level"], ["referral_rate", "Rate"], ["type", "Income Type"], ["description", "Income Description"], ["amount", "Amount (USDT)"], ["status", "Status"]];
   } else {
     columns = [["created_at", "Date & Time"], ["reference", "Ledger Ref"], ["type", "Transaction Type"], ["description", "Description"], ["amount", "Amount (USDT)"], ["status", "Status"]];
   }
 
   function renderCell(row, key) {
-    if (["amount", "net_amount", "fee", "basis_amount"].includes(key) || (key === "value" && /USDT/i.test(String(row.name || "")))) {
+    if (["amount", "net_amount", "fee", "basis_amount", "total_amount"].includes(key) || (key === "value" && /USDT/i.test(String(row.name || "")))) {
       return money(row[key]);
     }
-    if (key === "rate") {
+    if (key === "referral_rate") {
       return row[key] == null ? "—" : `${(Number(row[key]) * (Number(row[key]) <= 1 ? 100 : 1)).toFixed(2)}%`;
     }
     if (key === "created_at" || key === "activated_at") return date(row[key]);
+    if (key === "referral_level") return row[key] ? "L" + row[key] : "—";
     if (key === "status") return <span className={`np-user-status ${statusClass(row[key])}`}>{row[key] || "unknown"}</span>;
     return <span className={["reference", "source_member_id", "novopay_id"].includes(key) ? "np-user-ref" : ""}>{row[key] ?? "—"}</span>;
   }

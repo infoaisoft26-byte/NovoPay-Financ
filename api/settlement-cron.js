@@ -135,7 +135,7 @@ export default async function handler(req, res) {
         GROUP BY u.novopay_id
       ), level_raw AS (
         SELECT chain.*, caps.cap_remaining,
-          round(chain.basis_amount * CASE WHEN chain.level=1 THEN 0.05 ELSE 0.01 END, 8) AS proposed_amount
+          round(chain.basis_amount * CASE WHEN chain.level=1 THEN 0.07 ELSE 0.01 END, 8) AS proposed_amount
         FROM sponsor_chain chain
         JOIN sponsor_caps caps ON caps.user_id=chain.sponsor_id
         WHERE caps.has_active_package
