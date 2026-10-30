@@ -102,11 +102,20 @@ const sectionQueries = {
       OR COALESCE(lt.type,'') ILIKE ${q} OR COALESCE(lt.description,'') ILIKE ${q} OR COALESCE(source.referred_user_id,'') ILIKE ${q} OR COALESCE(source.full_name,'') ILIKE ${q})
     ORDER BY lt.created_at DESC LIMIT ${limit}`,
   reports: (sql) => sql`SELECT 'Registered users' AS name, 'live' AS status, count(*)::text || ' accounts' AS details FROM users
-    UNION ALL SELECT 'Active package investment', 'live', COALESCE(to_char(sum(amount), 'FM999999990.00'), '0.00') || ' USDT' FROM package_activations WHERE status = 'active'
+    UNION ALL SELECT 'Active users', 'live', count(*)::text || ' accounts' FROM users WHERE lower(status)='active'
+    UNION ALL SELECT 'Active package investment', 'live', COALESCE(to_char(sum(amount),'FM999999990.00'),'0.00') || ' USDT' FROM package_activations WHERE lower(status)='active'
+    UNION ALL SELECT 'Total approved investment', 'live', COALESCE(to_char(sum(amount),'FM999999990.00'),'0.00') || ' USDT' FROM package_activations WHERE lower(status) IN ('active','completed','approved')
+    UNION ALL SELECT 'Total credited income', 'live', COALESCE(to_char(sum(amount),'FM999999990.00'),'0.00') || ' USDT' FROM ledger_transactions WHERE amount>0 AND lower(status) IN ('posted','completed','approved','paid') AND (lower(type) LIKE '%income%' OR lower(type) LIKE '%roi%' OR lower(type) LIKE '%level%' OR lower(type) LIKE '%referral%' OR lower(type) LIKE '%joining%' OR lower(type) LIKE '%retopup%' OR lower(type) LIKE '%bonus%' OR lower(type) LIKE '%salary%')
+    UNION ALL SELECT 'Today credited income', 'live', COALESCE(to_char(sum(amount),'FM999999990.00'),'0.00') || ' USDT' FROM ledger_transactions WHERE amount>0 AND lower(status) IN ('posted','completed','approved','paid') AND created_at>=date_trunc('day',now()) AND (lower(type) LIKE '%income%' OR lower(type) LIKE '%roi%' OR lower(type) LIKE '%level%' OR lower(type) LIKE '%referral%' OR lower(type) LIKE '%joining%' OR lower(type) LIKE '%retopup%' OR lower(type) LIKE '%bonus%' OR lower(type) LIKE '%salary%')
+    UNION ALL SELECT 'This month credited income', 'live', COALESCE(to_char(sum(amount),'FM999999990.00'),'0.00') || ' USDT' FROM ledger_transactions WHERE amount>0 AND lower(status) IN ('posted','completed','approved','paid') AND created_at>=date_trunc('month',now()) AND (lower(type) LIKE '%income%' OR lower(type) LIKE '%roi%' OR lower(type) LIKE '%level%' OR lower(type) LIKE '%referral%' OR lower(type) LIKE '%joining%' OR lower(type) LIKE '%retopup%' OR lower(type) LIKE '%bonus%' OR lower(type) LIKE '%salary%')
+    UNION ALL SELECT 'ROI income', 'live', COALESCE(to_char(sum(amount),'FM999999990.00'),'0.00') || ' USDT' FROM ledger_transactions WHERE amount>0 AND lower(status) IN ('posted','completed','approved','paid') AND lower(type) LIKE '%roi%'
+    UNION ALL SELECT 'Referral / joining income', 'live', COALESCE(to_char(sum(amount),'FM999999990.00'),'0.00') || ' USDT' FROM ledger_transactions WHERE amount>0 AND lower(status) IN ('posted','completed','approved','paid') AND (lower(type) LIKE '%referral%' OR lower(type) LIKE '%joining%' OR lower(type) LIKE '%first_deposit%')
+    UNION ALL SELECT 'Level income', 'live', COALESCE(to_char(sum(amount),'FM999999990.00'),'0.00') || ' USDT' FROM ledger_transactions WHERE amount>0 AND lower(status) IN ('posted','completed','approved','paid') AND lower(type) LIKE '%level%'
+    UNION ALL SELECT 'Retopup income', 'live', COALESCE(to_char(sum(amount),'FM999999990.00'),'0.00') || ' USDT' FROM ledger_transactions WHERE amount>0 AND lower(status) IN ('posted','completed','approved','paid') AND lower(type) LIKE '%retopup%'
     UNION ALL SELECT 'Ledger transactions', 'live', count(*)::text || ' entries' FROM ledger_transactions
-    UNION ALL SELECT 'Pending deposits', 'review', count(*)::text || ' requests' FROM deposits WHERE status = 'pending'
-    UNION ALL SELECT 'Pending withdrawals', 'review', count(*)::text || ' requests' FROM withdrawals WHERE status = 'pending'
-    UNION ALL SELECT 'Open support tickets', 'review', count(*)::text || ' tickets' FROM support_tickets WHERE status IN ('open', 'pending')`,
+    UNION ALL SELECT 'Pending deposits', 'review', count(*)::text || ' requests' FROM deposits WHERE lower(status)='pending'
+    UNION ALL SELECT 'Pending withdrawals', 'review', count(*)::text || ' requests' FROM withdrawals WHERE lower(status)='pending'
+    UNION ALL SELECT 'Open support tickets', 'review', count(*)::text || ' tickets' FROM support_tickets WHERE lower(status) IN ('open','pending')`,
   leaderboard: (sql, q, limit) => sql`WITH RECURSIVE network(root_id, member_id, level) AS (
       SELECT u.novopay_id, child.novopay_id, 1 FROM users u JOIN users child ON child.sponsor_user_id = u.novopay_id
       UNION ALL
