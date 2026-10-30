@@ -312,8 +312,8 @@ export default function UserDashboard({ user, onLogout }) {
           <h2 style={{margin:"0 0 10px"}}>{depositPopup.title}</h2><p style={{lineHeight:1.6,color:"#d1d5db"}}>{depositPopup.message}</p>
           <button type="button" onClick={()=>setDepositPopup(null)} style={{marginTop:12,border:0,borderRadius:10,padding:"11px 28px",background:"#d4af62",color:"#111827",fontWeight:800,cursor:"pointer"}}>Okay</button>
         </section>
-      </div>
-      <aside className={`np-user-sidebar ${mobileOpen ? "open" : ""}`}>
+      </div>}
+      <aside className={`np-user-sidebar ${mobileOpen ? "open" : ""}`}
         <div className="np-user-brand-row">
           <span className="np-user-brand"><img className="np-sidebar-logo" src="/novopay-logo.svg" alt="NovoPay Finance" /><small>MEMBER PORTAL</small></span>
           <button className="np-user-close" onClick={() => setMobileOpen(false)} aria-label="Close menu"><X size={19} /></button>
