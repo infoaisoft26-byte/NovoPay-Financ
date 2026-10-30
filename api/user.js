@@ -173,6 +173,10 @@ export default async function handler(req, res) {
       // browser lost the profile response. Never treat the same auth user as a duplicate.
       const existingProfile = await db`SELECT id, auth_uid, novopay_id, full_name, email, mobile, status, fund_balance, income_balance, referral_code, sponsor_user_id, created_at FROM users WHERE auth_uid = ${decoded.uid} LIMIT 1`;
       if (existingProfile[0]) {
+        if (existingProfile[0].referral_code !== existingProfile[0].novopay_id) {
+          await db`UPDATE users SET referral_code = novopay_id, updated_at = now() WHERE auth_uid = ${decoded.uid}`;
+          existingProfile[0].referral_code = existingProfile[0].novopay_id;
+        }
         if (!existingProfile[0].mobile && normalizedMobile) {
           const duplicateMobile = await db`SELECT novopay_id FROM users
             WHERE auth_uid <> ${decoded.uid}
@@ -213,8 +217,7 @@ export default async function handler(req, res) {
       if (!sponsorRows[0]) return res.status(400).json({ error: "Referral ID is invalid or inactive. Check the ID and try again." });
       const generatedId = "NP" + randomUUID().replace(/-/g, "").slice(0, 18).toUpperCase();
       await db`CREATE SEQUENCE IF NOT EXISTS novopay_referral_seq START WITH 503 INCREMENT BY 1`;
-      const referralRows = await db`SELECT 'NP' || lpad(nextval('novopay_referral_seq')::text, 6, '0') AS referral_code`;
-      const generatedReferral = referralRows[0].referral_code;
+      const generatedReferral = generatedId; // One canonical NovoPay ID is also the member's referral ID.
       const rows = await db`WITH new_user AS (
           INSERT INTO users (auth_uid, novopay_id, referral_code, sponsor_user_id, full_name, email, mobile)
           VALUES (${decoded.uid}, ${generatedId}, ${generatedReferral}, ${sponsorRows[0].novopay_id}, ${displayName}, ${email}, ${mobile})
