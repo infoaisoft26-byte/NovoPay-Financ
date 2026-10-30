@@ -245,7 +245,7 @@ export default async function handler(req, res) {
         basicPackageVisible: settings.basicPackageVisible !== false,
         fdPackageVisible: settings.fdPackageVisible !== false,
         depositVisible: settings.depositVisible !== false,
-        brochurePdfUrl: String(settings.brochurePdfUrl || "").trim().slice(0, 1000),
+        brochurePdfUrl: (() => { const value = String(settings.brochurePdfUrl || "").trim(); if (value.length > 1100000) throw Object.assign(new Error("Brochure is too large. Upload a PDF up to 750 KB."), { status: 400 }); if (value.startsWith("data:") && !value.startsWith("data:application/pdf;base64,")) throw Object.assign(new Error("Only PDF brochure uploads are accepted."), { status: 400 }); if (value && !value.startsWith("data:application/pdf;base64,") && !/^https:\/\//i.test(value)) throw Object.assign(new Error("Enter a secure HTTPS PDF link."), { status: 400 }); return value; })(),
         commissions
       };
       await db`CREATE TABLE IF NOT EXISTS system_settings (setting_key text PRIMARY KEY, setting_value jsonb NOT NULL DEFAULT '{}'::jsonb, updated_at timestamptz NOT NULL DEFAULT now(), updated_by text)`;
