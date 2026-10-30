@@ -42,6 +42,8 @@ const NAV_GROUPS = [
     { id: "fd-level", label: "FD Level Income", icon: Users },
     { id: "rd-level", label: "RD Level Income", icon: Users },
     { id: "salary", label: "Salary Income", icon: CreditCard },
+    { id: "daily-income-report", label: "Daily Income Report", icon: FileText },
+    { id: "monthly-income-report", label: "Monthly Income Report", icon: FileText },
   ]},
   { title: "REPORTS & SUPPORT", items: [
     { id: "reports", label: "Reports", icon: FileText },
@@ -77,6 +79,8 @@ const TITLES = {
   "fd-level": ["FD Level Income", "FD level income entries from your ledger."],
   "rd-level": ["RD Level Income", "RD level income entries from your ledger."],
   salary: ["Salary Income", "Salary entries recorded in your ledger."],
+  "daily-income-report": ["Daily Income Report", "Date-wise credited income, grouped by category (IST)."],
+  "monthly-income-report": ["Monthly Income Report", "Month-wise credited income, grouped by category (IST)."],
   reports: ["Reports", "Summary of your own account activity."],
   support: ["Support Tickets", "Track support requests linked to your account."],
   profile: ["My Profile", "Your registered account details."],
@@ -421,7 +425,7 @@ export default function UserDashboard({ user, onLogout }) {
             <PanelTitle title="Submit deposit transaction" subtitle="Submit your BSC transaction hash; funds are credited only after verification." /><form className="np-user-action-form" onSubmit={e => { e.preventDefault(); submitAction("deposit-request", { amount: depositAmount, tx_hash: txHash }); }}><label>Amount (USDT)<input type="number" min="2" step="0.00000001" required value={depositAmount} onChange={e => setDepositAmount(e.target.value)} /></label><label>BSC transaction hash<input required minLength={64} maxLength={66} value={txHash} onChange={e => setTxHash(e.target.value.trim())} placeholder="0x…" /></label><button disabled={actionBusy}>{actionBusy ? "Submitting…" : "Submit deposit request"}</button>{actionMessage && <p role="status">{actionMessage}</p>}</form><div className="np-user-table-toolbar"><PanelTitle title="Deposit history" subtitle="Your submitted requests" /><label className="np-user-search"><Search size={16} /><input value={query} onChange={e => setQuery(e.target.value)} placeholder="Search records…" /></label></div><Records rows={rows} type={section} loading={loading} /></>}</section>}
           {!error && section === "withdrawals" && <section className="np-user-panel"><PanelTitle title="Request a withdrawal" subtitle="5% service fee; payout is reviewed by admin. Confirm your address carefully." /><form className="np-user-action-form" onSubmit={e => { e.preventDefault(); submitAction("withdrawal-request", { amount: withdrawAmount, payout_address: payoutAddress }); }}><label>Amount (USDT)<input type="number" min="2" step="0.00000001" required value={withdrawAmount} onChange={e => setWithdrawAmount(e.target.value)} /></label><label>BSC payout address<input required pattern="0x[a-fA-F0-9]{40}" value={payoutAddress} onChange={e => setPayoutAddress(e.target.value.trim())} placeholder="0x…" /></label><button disabled={actionBusy}>{actionBusy ? "Submitting…" : "Request withdrawal"}</button>{actionMessage && <p role="status">{actionMessage}</p>}</form><div className="np-user-table-toolbar"><PanelTitle title="Withdrawal history" subtitle="Your submitted requests" /><label className="np-user-search"><Search size={16} /><input value={query} onChange={e => setQuery(e.target.value)} placeholder="Search records…" /></label></div><Records rows={rows} type={section} loading={loading} /></section>}
           {!error && section === "p2p" && <section className="np-user-panel"><PanelTitle title="P2P Transfer" subtitle="Send USDT from your Fund Wallet to another active NovoPay member." /><form className="np-user-action-form" onSubmit={e => { e.preventDefault(); submitAction("p2p-transfer", { receiver_id: p2pRecipient.trim().toUpperCase(), amount: p2pAmount }); }}><label>Recipient NovoPay ID<input required minLength={10} maxLength={32} value={p2pRecipient} onChange={e => setP2pRecipient(e.target.value.toUpperCase())} placeholder="NP…" /></label><label>Amount (USDT)<input type="number" min="0.00000001" step="0.00000001" required value={p2pAmount} onChange={e => setP2pAmount(e.target.value)} /></label><button disabled={actionBusy || !profile || Number(profile.fund_balance || 0) <= 0}>{actionBusy ? "Processing…" : "Send USDT"}</button>{actionMessage && <p role="status">{actionMessage}</p>}</form><div className="np-user-table-toolbar"><PanelTitle title="P2P transfer history" subtitle="Sent and received transfers" /><label className="np-user-search"><Search size={16} /><input value={query} onChange={e => setQuery(e.target.value)} placeholder="Search records…" /></label></div><Records rows={rows} type="p2p" loading={loading} /></section>}
-          {!error && ["transactions", "income-all", "basic-roi", "basic-referral", "basic-level", "fd-roi", "fd-referral", "fd-level", "rd-level", "salary", "direct-team", "team-list", "package-requests", "reports"].includes(section) && <section className="np-user-panel np-user-table-panel"><div className="np-user-table-toolbar"><PanelTitle title={title[0]} subtitle="Records returned for your account" />{["reports", "income-all", "basic-roi", "basic-referral", "basic-level", "fd-roi", "fd-referral", "fd-level", "rd-level", "salary", "transactions"].includes(section) && <button type="button" className="np-user-refresh" onClick={() => window.print()}><Download size={15}/> Download PDF</button>}<label className="np-user-search"><Search size={16} /><input value={query} onChange={e => setQuery(e.target.value)} placeholder="Search records…" /></label></div><Records rows={rows} type={section} loading={loading} /></section>}
+          {!error && ["transactions", "income-all", "basic-roi", "basic-referral", "basic-level", "fd-roi", "fd-referral", "fd-level", "rd-level", "salary", "daily-income-report", "monthly-income-report", "direct-team", "team-list", "package-requests", "reports"].includes(section) && <section className="np-user-panel np-user-table-panel"><div className="np-user-table-toolbar"><PanelTitle title={title[0]} subtitle="Records returned for your account" />{["reports", "income-all", "basic-roi", "basic-referral", "basic-level", "fd-roi", "fd-referral", "fd-level", "rd-level", "salary", "daily-income-report", "monthly-income-report", "transactions"].includes(section) && <button type="button" className="np-user-refresh" onClick={() => window.print()}><Download size={15}/> Download PDF</button>}<label className="np-user-search"><Search size={16} /><input value={query} onChange={e => setQuery(e.target.value)} placeholder="Search records…" /></label></div><Records rows={rows} type={section} loading={loading} /></section>}
           {!error && ["packages", "basic-package", "fd-package"].includes(section) && <>
             {section === "packages" && <section className="np-user-panel"><PanelTitle title="My package activations" subtitle="Your package purchases and activation status" /><Records rows={data?.activations || []} type="activations" loading={loading} /></section>}
             {section === "basic-package" && <section className="np-basic-activation">
@@ -524,6 +528,8 @@ function Records({ rows, type, loading }) {
     columns = [["novopay_id", "NovoPay ID"], ["full_name", "Member"], ["email", "Email"], ["status", "Status"], ["level", "Level"], ["created_at", "Joined"]];
   } else if (type === "reports") {
     columns = [["name", "Report"], ["value", "Value"]];
+  } else if (["daily-income-report", "monthly-income-report"].includes(type)) {
+    columns = [["period", "Date / Month (IST)"], ["income_category", "Income Category"], ["total_amount", "Credited Income (USDT)"], ["entries", "Entries"]];
   } else if (type === "referrals") {
     columns = [["created_at", "Date & Time"], ["referred_user_id", "Source Member ID"], ["reference", "Income Ref"], ["basis_amount", "Package Amount"], ["rate", "Rate"], ["amount", "Income (USDT)"], ["status", "Status"]];
   } else if (type === "activations") {
@@ -543,7 +549,7 @@ function Records({ rows, type, loading }) {
   }
 
   function renderCell(row, key) {
-    if (["amount", "net_amount", "fee", "basis_amount"].includes(key) || (key === "value" && /USDT/i.test(String(row.name || "")))) {
+    if (["amount", "net_amount", "fee", "basis_amount", "total_amount"].includes(key) || (key === "value" && /USDT/i.test(String(row.name || "")))) {
       return money(row[key]);
     }
     if (key === "referral_rate") {
