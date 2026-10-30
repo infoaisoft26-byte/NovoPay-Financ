@@ -74,22 +74,32 @@ const sectionQueries = {
   audit: (sql, q, limit) => sql`SELECT id, actor_uid, action, entity_type, entity_id, details, created_at FROM audit_logs WHERE (COALESCE(actor_uid, '') ILIKE ${q} OR COALESCE(action, '') ILIKE ${q} OR COALESCE(entity_id, '') ILIKE ${q}) ORDER BY created_at DESC LIMIT ${limit}`,
   posters: (sql, q, limit) => sql`SELECT id, title, image_url, status, starts_at, ends_at, created_at FROM offer_posters WHERE COALESCE(title, '') ILIKE ${q} ORDER BY created_at DESC LIMIT ${limit}`,
   "income-reports": (sql, q, limit) => sql`SELECT lt.id, lt.reference, lt.user_id, u.full_name, lt.type, lt.amount, lt.currency, lt.status, lt.description, lt.created_at,
+      source.referred_user_id AS source_member_id, COALESCE(source.full_name, '') AS source_member_name,
+      source.level AS referral_level, source.rate AS referral_rate, source.basis_amount,
       CASE
-        WHEN lower(concat_ws(' ', lt.type, lt.description)) LIKE '%salary%' THEN 'Salary Income'
-        WHEN lower(concat_ws(' ', lt.type, lt.description)) LIKE '%rd%level%' OR lower(concat_ws(' ', lt.type, lt.description)) LIKE '%recurring deposit%' THEN 'RD Level Income'
-        WHEN lower(concat_ws(' ', lt.type, lt.description)) LIKE '%fd%roi%' OR (lower(concat_ws(' ', lt.type, lt.description)) LIKE '%roi%' AND lower(concat_ws(' ', lt.type, lt.description)) LIKE '%fd%') THEN 'FD ROI Income'
-        WHEN lower(concat_ws(' ', lt.type, lt.description)) LIKE '%fd%referral%' OR (lower(concat_ws(' ', lt.type, lt.description)) LIKE '%referral%' AND lower(concat_ws(' ', lt.type, lt.description)) LIKE '%fd%') THEN 'FD Referral Income'
-        WHEN lower(concat_ws(' ', lt.type, lt.description)) LIKE '%fd%level%' OR (lower(concat_ws(' ', lt.type, lt.description)) LIKE '%level%' AND lower(concat_ws(' ', lt.type, lt.description)) LIKE '%fd%') THEN 'FD Level Income'
-        WHEN lower(concat_ws(' ', lt.type, lt.description)) LIKE '%basic%roi%' OR (lower(concat_ws(' ', lt.type, lt.description)) LIKE '%roi%' AND lower(concat_ws(' ', lt.type, lt.description)) LIKE '%basic%') THEN 'Basic ROI Income'
-        WHEN lower(concat_ws(' ', lt.type, lt.description)) LIKE '%basic%referral%' OR (lower(concat_ws(' ', lt.type, lt.description)) LIKE '%referral%' AND lower(concat_ws(' ', lt.type, lt.description)) LIKE '%basic%') THEN 'Basic Referral Income'
-        WHEN lower(concat_ws(' ', lt.type, lt.description)) LIKE '%basic%level%' OR (lower(concat_ws(' ', lt.type, lt.description)) LIKE '%level%' AND lower(concat_ws(' ', lt.type, lt.description)) LIKE '%basic%') THEN 'Basic Level Income'
-        WHEN lower(concat_ws(' ', lt.type, lt.description)) LIKE '%referral%' THEN 'Referral / Joining Income'
-        WHEN lower(concat_ws(' ', lt.type, lt.description)) LIKE '%level%' THEN 'Level Income'
-        WHEN lower(concat_ws(' ', lt.type, lt.description)) LIKE '%roi%' THEN 'ROI Income'
-        ELSE 'Other Ledger Entry'
-      END AS income_category
-    FROM ledger_transactions lt LEFT JOIN users u ON u.novopay_id = lt.user_id
-    WHERE (COALESCE(lt.user_id, '') ILIKE ${q} OR COALESCE(u.full_name, '') ILIKE ${q} OR COALESCE(lt.reference, '') ILIKE ${q} OR COALESCE(lt.type, '') ILIKE ${q} OR COALESCE(lt.description, '') ILIKE ${q})
+        WHEN lower(concat_ws(' ',lt.type,lt.description)) LIKE '%salary%' THEN 'Salary Income'
+        WHEN lower(concat_ws(' ',lt.type,lt.description)) LIKE '%retopup%' OR lower(concat_ws(' ',lt.type,lt.description)) LIKE '%re-topup%' THEN 'Retopup Income'
+        WHEN lower(concat_ws(' ',lt.type,lt.description)) LIKE '%joining%' OR lower(concat_ws(' ',lt.type,lt.description)) LIKE '%first deposit%' THEN 'Joining Income'
+        WHEN lower(concat_ws(' ',lt.type,lt.description)) LIKE '%fd%roi%' THEN 'FD ROI Income'
+        WHEN lower(concat_ws(' ',lt.type,lt.description)) LIKE '%fd%referral%' THEN 'FD Referral Income'
+        WHEN lower(concat_ws(' ',lt.type,lt.description)) LIKE '%fd%level%' THEN 'FD Level Income'
+        WHEN lower(concat_ws(' ',lt.type,lt.description)) LIKE '%basic%roi%' THEN 'Basic ROI Income'
+        WHEN lower(concat_ws(' ',lt.type,lt.description)) LIKE '%basic%referral%' THEN 'Basic Referral Income'
+        WHEN lower(concat_ws(' ',lt.type,lt.description)) LIKE '%basic%level%' THEN 'Basic Level Income'
+        WHEN lower(concat_ws(' ',lt.type,lt.description)) LIKE '%level%' THEN 'Level Income'
+        WHEN lower(concat_ws(' ',lt.type,lt.description)) LIKE '%referral%' THEN 'Referral Income'
+        WHEN lower(concat_ws(' ',lt.type,lt.description)) LIKE '%roi%' THEN 'ROI Income'
+        WHEN lower(concat_ws(' ',lt.type,lt.description)) LIKE '%bonus%' THEN 'Bonus Income'
+        ELSE 'Other Ledger Entry' END AS income_category
+    FROM ledger_transactions lt LEFT JOIN users u ON u.novopay_id=lt.user_id
+    LEFT JOIN LATERAL (
+      SELECT rc.referred_user_id, referred.full_name, rc.level, rc.rate, rc.basis_amount
+      FROM referral_commissions rc LEFT JOIN users referred ON referred.novopay_id=rc.referred_user_id
+      WHERE rc.sponsor_user_id=lt.user_id AND lt.description ILIKE '%' || rc.package_activation_ref || '%'
+      ORDER BY rc.created_at DESC LIMIT 1
+    ) source ON true
+    WHERE (COALESCE(lt.user_id,'') ILIKE ${q} OR COALESCE(u.full_name,'') ILIKE ${q} OR COALESCE(lt.reference,'') ILIKE ${q}
+      OR COALESCE(lt.type,'') ILIKE ${q} OR COALESCE(lt.description,'') ILIKE ${q} OR COALESCE(source.referred_user_id,'') ILIKE ${q} OR COALESCE(source.full_name,'') ILIKE ${q})
     ORDER BY lt.created_at DESC LIMIT ${limit}`,
   reports: (sql) => sql`SELECT 'Registered users' AS name, 'live' AS status, count(*)::text || ' accounts' AS details FROM users
     UNION ALL SELECT 'Active package investment', 'live', COALESCE(to_char(sum(amount), 'FM999999990.00'), '0.00') || ' USDT' FROM package_activations WHERE status = 'active'
