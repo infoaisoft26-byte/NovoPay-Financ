@@ -267,6 +267,6 @@ export default async function handler(req, res) {
     return res.status(200).json({ ok: true, record: result[0] });
   } catch (error) {
     console.error("[NovoPay API] /api/admin-actions failed", { name: error?.name, code: error?.code, status: error?.status });
-    return res.status(error?.status || 500).json({ error: error?.status === 503 ? error.message : "Admin action could not be completed safely." });
+    return res.status(error?.status || 500).json({ error: error?.status && error.status < 500 ? error.message : error?.status === 503 ? error.message : "Admin action could not be completed safely." });
   }
 }
