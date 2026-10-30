@@ -399,7 +399,7 @@ export default function UserDashboard({ user, onLogout }) {
               </section>
               <section className="np-user-panel np-user-level-income">
                 <PanelTitle title="Level-wise Income Details" subtitle="Actual credited amounts from your income ledger. Levels with no matching credited entry show 0.00." />
-                <LevelIncome title="ROI Level Income" rate="L1 5% · L2–L15 1%" values={data?.levelIncome?.roi || {}} />
+                <LevelIncome title="ROI Level Income" rate="L1 7% · L2–L15 1%" values={data?.levelIncome?.roi || {}} />
                 <LevelIncome title="Joining / First Deposit Level Income" rate="L1 5% · L2–L15 0.25%" values={data?.levelIncome?.joining || {}} />
                 <LevelIncome title="Retopup Income" rate="L1 1% · L2–L15 0.25%" values={data?.levelIncome?.retopup || {}} />
                 <p className="np-user-income-note">Rates show the configured schedule, not a guaranteed return. Credits appear here only after they are recorded in the ledger.</p>
@@ -537,7 +537,7 @@ function Records({ rows, type, loading }) {
   } else if (type === "p2p") {
     columns = [["created_at", "Date & Time"], ["reference", "Transfer Ref"], ["sender_user_id", "Sender ID"], ["receiver_user_id", "Recipient ID"], ["amount", "Amount (USDT)"], ["status", "Status"]];
   } else if (incomeSections.includes(type)) {
-    columns = [["created_at", "Date & Time"], ["source_member_id", "Source Member ID"], ["type", "Income Type"], ["description", "Income Description"], ["amount", "Amount (USDT)"], ["status", "Status"]];
+    columns = [["created_at", "Date & Time"], ["source_member_id", "Source Member ID"], ["source_member_name", "Source Member"], ["referral_level", "Level"], ["referral_rate", "Rate"], ["type", "Income Type"], ["description", "Income Description"], ["amount", "Amount (USDT)"], ["status", "Status"]];
   } else {
     columns = [["created_at", "Date & Time"], ["reference", "Ledger Ref"], ["type", "Transaction Type"], ["description", "Description"], ["amount", "Amount (USDT)"], ["status", "Status"]];
   }
@@ -546,10 +546,11 @@ function Records({ rows, type, loading }) {
     if (["amount", "net_amount", "fee", "basis_amount"].includes(key) || (key === "value" && /USDT/i.test(String(row.name || "")))) {
       return money(row[key]);
     }
-    if (key === "rate") {
+    if (key === "referral_rate") {
       return row[key] == null ? "—" : `${(Number(row[key]) * (Number(row[key]) <= 1 ? 100 : 1)).toFixed(2)}%`;
     }
     if (key === "created_at" || key === "activated_at") return date(row[key]);
+    if (key === "referral_level") return row[key] ? "L" + row[key] : "—";
     if (key === "status") return <span className={`np-user-status ${statusClass(row[key])}`}>{row[key] || "unknown"}</span>;
     return <span className={["reference", "source_member_id", "novopay_id"].includes(key) ? "np-user-ref" : ""}>{row[key] ?? "—"}</span>;
   }
