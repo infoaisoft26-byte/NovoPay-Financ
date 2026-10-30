@@ -187,7 +187,7 @@ export default async function handler(req, res) {
       const existingDeposit = await sql`SELECT reference, user_id, amount, currency, status, tx_hash, created_at
         FROM deposits WHERE lower(tx_hash) = ${normalizedHash} LIMIT 1`;
       if (existingDeposit[0]) {
-        if (existingDeposit[0].user_id !== profile.novopay_id) fail("This transaction hash has already been submitted.", 409);
+        if (existingDeposit[0].user_id !== profile.novopay_id) fail("Duplicate transaction hash automatically rejected. This BSC transaction has already been submitted on another account.", 409);
         return res.status(200).json({ ok: true, message: "Existing deposit request found. Checking blockchain confirmation.", record: existingDeposit[0] });
       }
       const rows = await sql`WITH created AS (
