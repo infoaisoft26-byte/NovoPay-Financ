@@ -277,7 +277,8 @@ export default async function handler(req, res) {
     const platformRows = await db`SELECT setting_value FROM system_settings WHERE setting_key='platform' LIMIT 1`;
     const platformSettings = platformRows[0]?.setting_value || {};
     const depositAddress = String(platformSettings.depositAddress || process.env.NOVOPAY_BEP20_DEPOSIT_ADDRESS || "0xBF2bfe77a6Fc846cF9881A5A93508c7D5d6658b3").trim();
-    const brochureUrl = section === "brochure" ? String(platformSettings.brochurePdfUrl || process.env.NOVOPAY_BROCHURE_URL || "").trim() : "";\n    const publicPlatformSettings = { ...platformSettings, brochurePdfUrl: "" };
+    const brochureUrl = section === "brochure" ? String(platformSettings.brochurePdfUrl || process.env.NOVOPAY_BROCHURE_URL || "").trim() : "";
+    const publicPlatformSettings = { ...platformSettings, brochurePdfUrl: "" };
     const maintenanceMode = platformSettings.maintenanceMode === true;
     if (maintenanceMode && decoded.admin !== true) return res.status(503).json({ error: "NovoPay Finance is temporarily under maintenance. Please try again later.", maintenanceMode: true });
 
