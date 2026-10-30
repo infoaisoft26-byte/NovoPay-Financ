@@ -34,7 +34,7 @@ export default async function handler(req, res) {
              COALESCE(NULLIF(BTRIM(full_name), ''), 'NovoPay member') AS sponsor_name
       FROM users
       WHERE LOWER(BTRIM(COALESCE(status, ''))) = 'active'
-        AND UPPER(BTRIM(COALESCE(novopay_id, ''))) = ${code}
+        AND (UPPER(BTRIM(COALESCE(novopay_id, ''))) = ${code} OR UPPER(BTRIM(COALESCE(referral_code, ''))) = ${code})
       LIMIT 1
     `;
 
