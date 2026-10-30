@@ -104,8 +104,8 @@ function recordCells(section, row) {
     case "Audit Logs": return [row.id || "—", row.actor_uid || "System", row.action || "—", (row.entity_type || "record") + " · " + (row.entity_id || "—"), stamp(row.created_at)];
     case "Offer Posters": return [row.id || "—", row.title || "—", row.status || "draft", row.image_url || "—", stamp(row.updated_at || row.created_at)];
     case "Reports": return [row.name || "Report", row.status || "—", row.details || "—", stamp(row.updated_at || row.created_at), row.id || "—"];
-    case "Income Reports": return [row.user_id || "—", row.full_name || "Member", row.income_category || row.type || "Income", amount(row.amount, row.currency), (row.status || "—") + " · " + stamp(row.created_at)];
-    case "Income Leaderboard": return [row.rank == null ? "—" : "#" + row.rank, row.novopay_id || "—", row.full_name || "Member", amount(row.total_investment), "Level " + (row.level || "—") + " · Direct " + (row.direct_members ?? "—")];
+    case "Income Reports": return [row.user_id || "—", row.full_name || "Member", row.income_category || row.type || "Income", row.source_member_id || "—", row.source_member_name || "—", row.referral_level ? "L" + row.referral_level : "—", row.referral_rate == null ? "—" : row.referral_rate + "%", amount(row.basis_amount), amount(row.amount, row.currency), (row.status || "—") + " · " + stamp(row.created_at)];
+    case "Income Leaderboard": return [row.rank == null ? "—" : "#" + row.rank, row.novopay_id || "—", row.full_name || "Member", amount(row.total_investment), String(row.direct_members ?? 0), String(row.team_count ?? 0), [1,2,3,4,5,6,7,8,9,10,11,12,13,14,15].map(level => "L" + level + ": " + (row["level_" + level] ?? 0)).join(" · ")];
     case "Settings": return [row.name || "Setting", row.status || "—", row.details || "—", stamp(row.updated_at), row.id || "—"];
     default: return [row.id || row.reference || "—", row.user_id || "—", row.type || row.name || "Record", row.status || "—", stamp(row.created_at || row.updated_at)];
   }
@@ -121,8 +121,8 @@ const tableColumns = {
   Packages: ["PACKAGE NAME", "TYPE", "PRICE", "ROI / DURATION", "STATUS"],
   "Package Activations": ["ACTIVATION REF", "USER ID", "PACKAGE", "AMOUNT", "STATUS"],
   Reports: ["REPORT", "STATUS", "SUMMARY", "UPDATED", "RECORD ID"],
-  "Income Reports": ["USER ID", "MEMBER", "INCOME TYPE", "AMOUNT", "STATUS / DATE"],
-  "Income Leaderboard": ["RANK", "NOVOPAY ID", "MEMBER", "TOTAL INVESTMENT", "LEVEL / TEAM"],
+  "Income Reports": ["USER ID", "MEMBER", "INCOME TYPE", "SOURCE MEMBER ID", "SOURCE MEMBER", "LEVEL", "RATE", "BASIS", "INCOME", "STATUS / DATE"],
+  "Income Leaderboard": ["RANK", "NOVOPAY ID", "MEMBER", "TOTAL INVESTMENT", "DIRECTS", "TOTAL TEAM", "LEVEL-WISE TEAM (L1–L15)"],
   "Support Tickets": ["TICKET REF", "USER ID", "SUBJECT", "STATUS", "LAST UPDATED"],
   "Website Feedback": ["FEEDBACK ID", "USER", "RATING", "MESSAGE", "SUBMITTED"],
   "Survey Responses": ["RESPONSE ID", "USER ID", "SURVEY", "STATUS", "RESPONSE DETAILS"],
