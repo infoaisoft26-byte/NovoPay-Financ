@@ -26,6 +26,8 @@ const navGroups = [
     { label: "Package Activations", icon: PackageCheck },
     { label: "Reports", icon: ChartNoAxesCombined },
     { label: "Income Reports", icon: Activity },
+    { label: "Daily Income Report", icon: FileText },
+    { label: "Monthly Income Report", icon: FileText },
     { label: "Income Leaderboard", icon: Trophy },
   ]},
   { title: "OPERATIONS & SECURITY", items: [
@@ -51,6 +53,8 @@ const descriptions = {
   Reports: "Review platform, transaction and finance summaries.",
   "Income Leaderboard": "Rank eligible accounts using verified NovoPay records.",
   "Income Reports": "Platform-wide income and ledger report across all members, categories and statuses.",
+  "Daily Income Report": "Date-wise posted income grouped by category using India Standard Time.",
+  "Monthly Income Report": "Month-wise posted income grouped by category using India Standard Time.",
   "Support Tickets": "Manage customer questions and support status.",
   "Website Feedback": "Review submitted product feedback.",
   "Survey Responses": "Review user survey submissions.",
@@ -83,7 +87,7 @@ const sectionSlugs = {
   Withdrawals: "withdrawals", Transactions: "transactions", "P2P Transfers": "p2p",
   Packages: "packages", "Package Activations": "activations", "Support Tickets": "support",
   "Website Feedback": "feedback", "Survey Responses": "surveys", "Audit Logs": "audit", "Offer Posters": "posters",
-  Reports: "reports", "Income Reports": "income-reports", "Income Leaderboard": "leaderboard", Settings: "settings",
+  Reports: "reports", "Income Reports": "income-reports", "Daily Income Report": "daily-income-report", "Monthly Income Report": "monthly-income-report", "Income Leaderboard": "leaderboard", Settings: "settings",
 };
 
 function recordCells(section, row) {
@@ -104,6 +108,8 @@ function recordCells(section, row) {
     case "Audit Logs": return [row.id || "—", row.actor_uid || "System", row.action || "—", (row.entity_type || "record") + " · " + (row.entity_id || "—"), stamp(row.created_at)];
     case "Offer Posters": return [row.id || "—", row.title || "—", row.status || "draft", row.image_url || "—", stamp(row.updated_at || row.created_at)];
     case "Reports": return [row.name || "Report", row.status || "—", row.details || "—", stamp(row.updated_at || row.created_at), row.id || "—"];
+    case "Daily Income Report":
+    case "Monthly Income Report": return [row.period || "—", row.income_category || "—", amount(row.total_amount), row.entries ?? 0];
     case "Income Reports": return [row.user_id || "—", row.full_name || "Member", row.income_category || row.type || "Income", row.source_member_id || "—", row.source_member_name || "—", row.referral_level ? "L" + row.referral_level : "—", row.referral_rate == null ? "—" : row.referral_rate + "%", amount(row.basis_amount), amount(row.amount, row.currency), (row.status || "—") + " · " + stamp(row.created_at)];
     case "Income Leaderboard": return [row.rank == null ? "—" : "#" + row.rank, row.novopay_id || "—", row.full_name || "Member", amount(row.total_investment), String(row.direct_members ?? 0), String(row.team_count ?? 0), [1,2,3,4,5,6,7,8,9,10,11,12,13,14,15].map(level => "L" + level + ": " + (row["level_" + level] ?? 0)).join(" · ")];
     case "Settings": return [row.name || "Setting", row.status || "—", row.details || "—", stamp(row.updated_at), row.id || "—"];
@@ -122,6 +128,8 @@ const tableColumns = {
   "Package Activations": ["ACTIVATION REF", "USER ID", "PACKAGE", "AMOUNT", "STATUS"],
   Reports: ["REPORT", "STATUS", "SUMMARY", "UPDATED", "RECORD ID"],
   "Income Reports": ["USER ID", "MEMBER", "INCOME TYPE", "SOURCE MEMBER ID", "SOURCE MEMBER", "LEVEL", "RATE", "BASIS", "INCOME", "STATUS / DATE"],
+  "Daily Income Report": ["DATE (IST)", "INCOME CATEGORY", "TOTAL CREDITED", "ENTRIES"],
+  "Monthly Income Report": ["MONTH (IST)", "INCOME CATEGORY", "TOTAL CREDITED", "ENTRIES"],
   "Income Leaderboard": ["RANK", "NOVOPAY ID", "MEMBER", "TOTAL INVESTMENT", "DIRECTS", "TOTAL TEAM", "LEVEL-WISE TEAM (L1–L15)"],
   "Support Tickets": ["TICKET REF", "USER ID", "SUBJECT", "STATUS", "LAST UPDATED"],
   "Website Feedback": ["FEEDBACK ID", "USER", "RATING", "MESSAGE", "SUBMITTED"],
