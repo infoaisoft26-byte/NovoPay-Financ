@@ -101,6 +101,20 @@ const sectionQueries = {
     WHERE (COALESCE(lt.user_id,'') ILIKE ${q} OR COALESCE(u.full_name,'') ILIKE ${q} OR COALESCE(lt.reference,'') ILIKE ${q}
       OR COALESCE(lt.type,'') ILIKE ${q} OR COALESCE(lt.description,'') ILIKE ${q} OR COALESCE(source.referred_user_id,'') ILIKE ${q} OR COALESCE(source.full_name,'') ILIKE ${q})
     ORDER BY lt.created_at DESC LIMIT ${limit}`,
+  "daily-income-report": (sql, q, limit) => sql`SELECT (created_at AT TIME ZONE 'Asia/Kolkata')::date::text AS period,
+      CASE WHEN lower(type) LIKE '%retopup%' THEN 'Retopup Income' WHEN lower(type) LIKE '%joining%' OR lower(type) LIKE '%referral%' THEN 'Referral / Joining Income' WHEN lower(type) LIKE '%level%' THEN 'Level Income' WHEN lower(type) LIKE '%roi%' THEN 'ROI Income' WHEN lower(type) LIKE '%salary%' THEN 'Salary Income' WHEN lower(type) LIKE '%bonus%' THEN 'Bonus Income' ELSE 'Other Income' END AS income_category,
+      COALESCE(SUM(amount),0)::numeric(20,8) AS total_amount, count(*)::int AS entries
+    FROM ledger_transactions WHERE amount>0 AND lower(status) IN ('posted','completed','approved','paid')
+      AND (lower(type) LIKE '%income%' OR lower(type) LIKE '%roi%' OR lower(type) LIKE '%level%' OR lower(type) LIKE '%referral%' OR lower(type) LIKE '%joining%' OR lower(type) LIKE '%retopup%' OR lower(type) LIKE '%bonus%' OR lower(type) LIKE '%salary%')
+      AND ((created_at AT TIME ZONE 'Asia/Kolkata')::date::text ILIKE ${q} OR lower(type) ILIKE ${q} OR user_id ILIKE ${q})
+    GROUP BY period,income_category ORDER BY period DESC,income_category LIMIT ${limit}`,
+  "monthly-income-report": (sql, q, limit) => sql`SELECT to_char(date_trunc('month',created_at AT TIME ZONE 'Asia/Kolkata'),'YYYY-MM') AS period,
+      CASE WHEN lower(type) LIKE '%retopup%' THEN 'Retopup Income' WHEN lower(type) LIKE '%joining%' OR lower(type) LIKE '%referral%' THEN 'Referral / Joining Income' WHEN lower(type) LIKE '%level%' THEN 'Level Income' WHEN lower(type) LIKE '%roi%' THEN 'ROI Income' WHEN lower(type) LIKE '%salary%' THEN 'Salary Income' WHEN lower(type) LIKE '%bonus%' THEN 'Bonus Income' ELSE 'Other Income' END AS income_category,
+      COALESCE(SUM(amount),0)::numeric(20,8) AS total_amount, count(*)::int AS entries
+    FROM ledger_transactions WHERE amount>0 AND lower(status) IN ('posted','completed','approved','paid')
+      AND (lower(type) LIKE '%income%' OR lower(type) LIKE '%roi%' OR lower(type) LIKE '%level%' OR lower(type) LIKE '%referral%' OR lower(type) LIKE '%joining%' OR lower(type) LIKE '%retopup%' OR lower(type) LIKE '%bonus%' OR lower(type) LIKE '%salary%')
+      AND (to_char(date_trunc('month',created_at AT TIME ZONE 'Asia/Kolkata'),'YYYY-MM') ILIKE ${q} OR lower(type) ILIKE ${q} OR user_id ILIKE ${q})
+    GROUP BY period,income_category ORDER BY period DESC,income_category LIMIT ${limit}`,
   reports: (sql) => sql`SELECT 'Registered users' AS name, 'live' AS status, count(*)::text || ' accounts' AS details FROM users
     UNION ALL SELECT 'Active users', 'live', count(*)::text || ' accounts' FROM users WHERE lower(status)='active'
     UNION ALL SELECT 'Active package investment', 'live', COALESCE(to_char(sum(amount),'FM999999990.00'),'0.00') || ' USDT' FROM package_activations WHERE lower(status)='active'
