@@ -120,7 +120,6 @@ export default function UserDashboard({ user, onLogout }) {
   const [posterPopup, setPosterPopup] = useState(null);
   const [reviewPopup, setReviewPopup] = useState(false);
   const [reviewText, setReviewText] = useState("");
-  const [reviewRating, setReviewRating] = useState(5);
   const [reviewBusy, setReviewBusy] = useState(false);
   const loginPromptsHandled = useRef(false);
   const previousDepositStatuses = useRef(null);
@@ -342,7 +341,7 @@ export default function UserDashboard({ user, onLogout }) {
       const response = await fetch("/api/user-actions", {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: "Bearer " + token },
-        body: JSON.stringify({ action: "website-review-submit", message: reviewText, rating: reviewRating })
+        body: JSON.stringify({ action: "website-review-submit", message: reviewText })
       });
       const payload = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(payload.error || "Your review could not be submitted.");
