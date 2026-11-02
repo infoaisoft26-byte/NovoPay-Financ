@@ -211,3 +211,56 @@
 .np-admin-data-toolbar{gap:18px}
 .np-admin-search:focus-within{border-color:#8da5ed;box-shadow:0 0 0 3px #4169e10f}
 @media(max-width:760px){.np-admin-table-head{min-width:780px;padding:12px 15px}.np-admin-record-row,.np-admin-record-row.has-actions{min-width:780px;padding:14px 15px;gap:12px}.np-admin-data-toolbar{position:relative}.np-admin-record-list{max-width:100%}}
+
+
+/* NovoPay admin control desk — polished motion and review workspaces */
+@keyframes np-admin-enter{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}
+@keyframes np-admin-glow{0%,100%{box-shadow:0 10px 30px rgba(20,35,62,.045)}50%{box-shadow:0 14px 38px rgba(65,105,225,.11)}}
+@keyframes np-admin-pulse{0%,100%{opacity:1}50%{opacity:.45}}
+.np-admin-main{min-width:0}
+.np-admin-content{animation:np-admin-enter .42s cubic-bezier(.2,.75,.25,1) both}
+.np-admin-heading-row h1{letter-spacing:-1.1px}
+.np-admin-welcome{position:relative;overflow:hidden;background:linear-gradient(115deg,#111f38 0%,#1b3155 58%,#263f70 100%);border:1px solid #314b78;box-shadow:0 18px 44px rgba(13,29,55,.14);color:#fff}
+.np-admin-welcome:after{content:"";position:absolute;width:260px;height:260px;right:-75px;top:-155px;border:1px solid rgba(255,255,255,.12);border-radius:50%;box-shadow:0 0 0 28px rgba(255,255,255,.035),0 0 0 58px rgba(255,255,255,.025);pointer-events:none}
+.np-admin-welcome h2,.np-admin-welcome p{color:#fff}
+.np-admin-welcome p{opacity:.76}
+.np-admin-welcome-icon{background:rgba(255,255,255,.13);color:#d9e5ff;border:1px solid rgba(255,255,255,.12)}
+.np-admin-ready-pill{background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.17);color:#f1f5ff}
+.np-admin-ready-pill span,.np-admin-live-label span{animation:np-admin-pulse 2s ease-in-out infinite}
+.np-admin-stat-card,.np-admin-panel,.np-admin-backend-banner{animation:np-admin-enter .48s both;transition:transform .22s ease,box-shadow .22s ease,border-color .22s ease}
+.np-admin-stat-card:nth-child(2){animation-delay:45ms}.np-admin-stat-card:nth-child(3){animation-delay:90ms}.np-admin-stat-card:nth-child(4){animation-delay:135ms}
+.np-admin-stat-card:hover,.np-admin-panel:hover{transform:translateY(-3px);box-shadow:0 16px 38px rgba(20,35,62,.085);border-color:#d6e0f3}
+.np-admin-stat-icon{transition:transform .25s ease,background .25s ease}
+.np-admin-stat-card:hover .np-admin-stat-icon{transform:rotate(-7deg) scale(1.07);background:#e8eeff;color:#315bd5}
+.np-admin-nav-item{transition:background .18s ease,color .18s ease,transform .18s ease}
+.np-admin-nav-item:hover{transform:translateX(3px)}
+.np-admin-nav-item.active{box-shadow:inset 3px 0 0 #7f9cff,0 5px 16px rgba(16,31,56,.08)}
+.np-admin-quick-link{transition:background .18s ease,transform .18s ease,padding .18s ease}
+.np-admin-quick-link:hover{transform:translateX(4px);background:#f5f8ff}
+.np-admin-quick-icon{transition:transform .2s ease}
+.np-admin-quick-link:hover .np-admin-quick-icon{transform:scale(1.08)}
+.np-admin-record-row{transition:background .18s ease,box-shadow .18s ease}
+.np-admin-record-row:hover{background:linear-gradient(90deg,#f5f8ff,#fff);box-shadow:inset 3px 0 #8aa3f3}
+.np-admin-module-support .np-admin-record-row,.np-admin-module-feedback .np-admin-record-row,.np-admin-module-posters .np-admin-record-row,.np-admin-module-leaderboard .np-admin-record-row{min-height:76px;align-items:center}
+.np-admin-module-support .np-admin-record-row span:nth-child(3){font-weight:700;color:#273954}
+.np-admin-module-support .np-admin-record-row span:nth-child(4){display:inline-flex;width:max-content;max-width:100%;padding:5px 10px;border-radius:99px;background:#eef3ff;color:#315bd5;font-size:10px;font-weight:800;text-transform:capitalize}
+.np-admin-module-feedback .np-admin-record-row span:nth-child(4){color:#4b5b73;line-height:1.7}
+.np-review-rating{display:flex;align-items:center;gap:3px;color:#e3a52f!important;white-space:nowrap;font-size:15px;letter-spacing:1px}
+.np-review-rating small{margin-left:5px;color:#6d7b90;font-size:10px;letter-spacing:0}
+.np-poster-preview-cell{display:flex;align-items:center;gap:10px}
+.np-poster-preview-cell img{width:58px;height:72px;object-fit:cover;border:1px solid #e3e9f2;border-radius:8px;background:#f4f6fa;box-shadow:0 5px 13px rgba(20,35,62,.1)}
+.np-poster-preview-cell a{color:#315bd5;font-size:10px;font-weight:800;text-decoration:underline;text-underline-offset:3px}
+.np-admin-module-posters .np-admin-record-row{min-height:94px}
+.np-admin-module-leaderboard .np-admin-record-row:first-child{background:linear-gradient(90deg,#fff9e9,#fff)}
+.np-admin-module-leaderboard .np-admin-record-row:first-child span:first-child{color:#a87918}
+.np-admin-data-toolbar{background:linear-gradient(180deg,#fff,#fbfcff)}
+.np-admin-data-title h3{letter-spacing:-.3px}
+.np-admin-search{transition:border-color .18s ease,box-shadow .18s ease}
+.np-admin-refresh,.np-admin-icon-button,.np-admin-action-button{transition:transform .18s ease,box-shadow .18s ease,background .18s ease}
+.np-admin-refresh:hover,.np-admin-icon-button:hover{transform:translateY(-2px);box-shadow:0 7px 18px rgba(25,44,78,.1)}
+.np-admin-action-button.success:hover{box-shadow:0 7px 16px rgba(49,91,213,.2)}
+.np-admin-empty{background:radial-gradient(ellipse at 50% 35%,#f7f9ff 0,#fff 70%)}
+.np-admin-notice{animation:np-admin-enter .25s ease both}
+.np-admin-inline-error{animation:np-admin-enter .25s ease both}
+@media(prefers-reduced-motion:reduce){.np-admin-content,.np-admin-stat-card,.np-admin-panel,.np-admin-backend-banner,.np-admin-notice,.np-admin-inline-error{animation:none!important}.np-admin-stat-card,.np-admin-panel,.np-admin-nav-item,.np-admin-quick-link,.np-admin-record-row,.np-admin-action-button,.np-admin-refresh{transition:none!important}}
+@media(max-width:760px){.np-admin-welcome:after{right:-160px}.np-poster-preview-cell img{width:48px;height:62px}.np-admin-module-support .np-admin-record-row,.np-admin-module-feedback .np-admin-record-row,.np-admin-module-posters .np-admin-record-row,.np-admin-module-leaderboard .np-admin-record-row{min-height:68px}}
