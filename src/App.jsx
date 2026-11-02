@@ -247,7 +247,7 @@ function AuthScreen({ mode, setMode, name, setName, mobile, setMobile, sponsorCo
           {notice && <p className="np-notice" role="status">{notice}</p>}
           
           {adminLogin && <button className="np-back-link" onClick={() => { setMode("login"); navigate("/"); }}>← Back to user login</button>}
-          {!adminLogin && <><p className="np-legal">By continuing, you agree to NovoPay Finance’s account terms and responsible-use policy.</p><button type="button" className="np-admin-link" onClick={() => { setMode("login"); navigate("/admin/login"); }}>Admin login</button></>}
+          {!adminLogin && <p className="np-legal">By continuing, you agree to NovoPay Finance’s account terms and responsible-use policy.</p>}
         </section>
       </section>
       <footer className="np-auth-footer"><span>© {new Date().getFullYear()} NovoPay Finance</span><span>Developed by <strong>AISOFT Studio</strong></span></footer>
