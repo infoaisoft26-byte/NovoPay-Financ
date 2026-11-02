@@ -226,6 +226,24 @@ export default async function handler(req, res) {
         result = await db`INSERT INTO packages (name, package_code, package_type, price, roi_rate, duration_days, currency, description, status) VALUES (${name},${packageCode},${packageType},${price},${roiRate},${durationDays},'USDT',${description},${packageStatus}) RETURNING id,name,package_code,package_type,price,roi_rate,duration_days,currency,description,status,created_at,updated_at`;
       }
       if (result.length) await db`INSERT INTO audit_logs(actor_uid,action,entity_type,entity_id,details) VALUES (${actor.uid},${packageId ? 'package_updated' : 'package_created'},'package',${String(result[0].id)},${JSON.stringify({name,packageCode,packageType,price,roiRate,durationDays,status:packageStatus})}::jsonb)`;
+    } else if (action === "save-poster") {
+      const title = String(body.title || "").trim().slice(0, 120);
+      const imageUrl = String(body.image_url || "").trim();
+      if (!title) return res.status(400).json({ error: "Enter a poster title." });
+      if (imageUrl.length > 3200000) return res.status(400).json({ error: "Poster image is too large. Use an image up to 2 MB." });
+      const validDataImage = imageUrl.startsWith("data:image/") && imageUrl.includes(";base64,");
+      const validImageUrl = imageUrl.startsWith("https://");
+      if (!validDataImage && !validImageUrl) return res.status(400).json({ error: "Upload an image or use a secure HTTPS image link." });
+      result = await db`INSERT INTO offer_posters(title,image_url,status)
+        VALUES (${title},${imageUrl},'active')
+        RETURNING id,title,image_url,status,starts_at,ends_at,created_at`;
+      if (result[0]) await db`INSERT INTO audit_logs(actor_uid,action,entity_type,entity_id,details)
+        VALUES (${actor.uid},'poster_published','offer_poster',${String(result[0].id)},jsonb_build_object('title',${title}))`;
+    } else if (action === "poster-status" && id && ["active","paused","archived"].includes(status)) {
+      result = await db`UPDATE offer_posters SET status=${status} WHERE id::text=${id}
+        RETURNING id,title,image_url,status,starts_at,ends_at,created_at`;
+      if (result[0]) await db`INSERT INTO audit_logs(actor_uid,action,entity_type,entity_id,details)
+        VALUES (${actor.uid},'poster_status_changed','offer_poster',${String(result[0].id)},jsonb_build_object('status',${status}))`;
     } else if (action === "save-settings") {
       const settings = body.settings;
       if (!settings || typeof settings !== "object" || Array.isArray(settings)) return res.status(400).json({ error: "Settings payload is required." });
