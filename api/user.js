@@ -336,7 +336,7 @@ export default async function handler(req, res) {
           lower(type) LIKE '%income%' OR lower(type) LIKE '%roi%' OR lower(type) LIKE '%level%' OR lower(type) LIKE '%joining%' OR lower(type) LIKE '%retopup%' OR lower(type) LIKE '%bonus%' OR lower(type) LIKE '%principal_return%'
           OR lower(description) LIKE '%income%' OR lower(description) LIKE '%roi%' OR lower(description) LIKE '%level%' OR lower(description) LIKE '%joining%' OR lower(description) LIKE '%retopup%' OR lower(description) LIKE '%bonus%' OR lower(description) LIKE '%principal return%'
         )`,
-        db`SELECT id, title, image_url, created_at FROM offer_posters WHERE lower(status)='active' AND (starts_at IS NULL OR starts_at<=now()) AND (ends_at IS NULL OR ends_at>now()) ORDER BY created_at DESC LIMIT 1`,
+        db`SELECT id, title, image_url, created_at FROM offer_posters WHERE lower(status)='published' AND (starts_at IS NULL OR starts_at<=now()) AND (ends_at IS NULL OR ends_at>now()) ORDER BY created_at DESC LIMIT 1`,
         db`SELECT id FROM website_feedback WHERE user_id=${profile.novopay_id} LIMIT 1`,
       ]);
       const eligibleActivations = activations.filter(row => ['active','completed','approved'].includes(String(row.status || '').toLowerCase()));
