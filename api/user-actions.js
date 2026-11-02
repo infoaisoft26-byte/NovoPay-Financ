@@ -55,11 +55,9 @@ export default async function handler(req, res) {
 
     if (action === "website-review-submit") {
       const message = String(req.body?.message || "").trim().slice(0, 1000);
-      const rating = Number(req.body?.rating);
       if (message.length < 10) fail("Please write at least 10 characters for your review.");
-      if (!Number.isInteger(rating) || rating < 1 || rating > 5) fail("Choose a rating from 1 to 5 stars.");
-      const saved = await sql`INSERT INTO website_feedback (user_id, message, rating, status)
-        SELECT ${profile.novopay_id}, ${message}, ${rating}, 'submitted'
+      const saved = await sql`INSERT INTO website_feedback (user_id, message, status)
+        SELECT ${profile.novopay_id}, ${message}, 'new'
         WHERE NOT EXISTS (SELECT 1 FROM website_feedback WHERE user_id=${profile.novopay_id})
         RETURNING id, created_at`;
       if (!saved[0]) fail("You have already submitted your website review.", 409);
