@@ -361,7 +361,8 @@ export default async function handler(req, res) {
       const totalCap = recordedInvestment * 5;
       return res.status(200).json({
         ok: true, section, user: profile, rows: recentTransactions, recentTransactions, depositAddress, brochureUrl, maintenanceMode, platformSettings: publicPlatformSettings,
-        activations, packages: visiblePackages, levelIncome, sponsor: sponsorRows[0] || null,\n        activePoster: posterRows[0] || null, hasReviewed: reviewRows.length > 0,
+        activations, packages: visiblePackages, levelIncome, sponsor: sponsorRows[0] || null,
+        activePoster: posterRows[0] || null, hasReviewed: reviewRows.length > 0,
         capping: { recordedInvestment, totalCap, countedIncome, remainingCap: Math.max(0, totalCap - countedIncome) },
         summary: { pendingDeposits: pendingDeposits[0]?.count ?? 0, pendingWithdrawals: pendingWithdrawals[0]?.count ?? 0, activePackages: activePackages[0]?.count ?? 0 },
         incomeSummary: { totalIncome: countedIncome, totalInvestment: recordedInvestment },
