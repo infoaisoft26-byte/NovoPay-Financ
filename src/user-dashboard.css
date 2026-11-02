@@ -328,3 +328,15 @@ html,body,#root{width:100%;min-width:0;max-width:100%;margin:0}
 @keyframes npActivationCheck{from{opacity:0;transform:scale(.55) rotate(-20deg)}to{opacity:1;transform:scale(1) rotate(0)}}
 @keyframes npActivationSparkle{0%,100%{transform:translateY(0) rotate(0);opacity:.5}50%{transform:translateY(-9px) rotate(18deg);opacity:1}}
 @media(prefers-reduced-motion:reduce){.np-activation-modal-backdrop,.np-activation-modal,.np-activation-check,.np-activation-confetti span{animation:none!important}}
+
+/* Member announcements, one-time review prompt and permanent brochure link */
+.np-member-poster-backdrop,.np-member-review-backdrop{position:fixed;inset:0;z-index:12000;display:grid;place-items:center;padding:18px;background:rgba(3,7,18,.82);backdrop-filter:blur(8px)}
+.np-member-poster-card,.np-member-review-card{position:relative;width:min(540px,100%);max-height:92vh;overflow:auto;padding:26px;border:1px solid rgba(190,151,76,.6);border-radius:22px;background:#101827;color:#f8fafc;box-shadow:0 28px 90px rgba(0,0,0,.55);animation:np-admin-enter .24s ease-out}
+.np-member-poster-card h2,.np-member-review-card h2{margin:7px 0 16px;font-size:24px;color:#fff}.np-member-poster-card>img{display:block;width:100%;max-height:62vh;object-fit:contain;border-radius:12px;background:#070b13}
+.np-member-poster-close{position:absolute;top:12px;right:12px;width:34px;height:34px;border:1px solid #475569;border-radius:50%;background:#1e293b;color:#fff;font-size:24px;line-height:1;cursor:pointer}
+.np-member-poster-confirm,.np-member-review-card button[type=submit]{border:0;border-radius:10px;padding:12px 18px;background:#d4af62;color:#111827;font-weight:800;cursor:pointer}
+.np-member-poster-confirm{display:block;width:100%;margin-top:16px}.np-member-review-card>p:not(.np-user-eyebrow){color:#cbd5e1;line-height:1.6}.np-member-review-card textarea{width:100%;min-height:130px;resize:vertical;padding:13px;border:1px solid #475569;border-radius:12px;background:#0b1220;color:#f8fafc;font:inherit}
+.np-member-review-card>div{display:flex;justify-content:flex-end;gap:10px;margin-top:18px}.np-member-review-card .np-member-review-later{border:1px solid #475569;border-radius:10px;padding:12px 18px;background:transparent;color:#e2e8f0;cursor:pointer}.np-member-review-card button:disabled{opacity:.5;cursor:not-allowed}
+.np-user-brochure-banner{display:flex;align-items:center;justify-content:space-between;gap:16px;margin:18px 0;padding:17px 19px;border:1px solid rgba(190,151,76,.35);border-radius:15px;background:linear-gradient(110deg,rgba(185,151,80,.12),rgba(15,23,42,.04))}
+.np-user-brochure-banner>div{display:grid;gap:5px}.np-user-brochure-banner b{color:#f8fafc}.np-user-brochure-banner small{color:#94a3b8}.np-user-brochure-banner a{display:inline-flex;align-items:center;gap:8px;white-space:nowrap;padding:10px 14px;border-radius:9px;background:#d4af62;color:#111827;font-weight:800;text-decoration:none}
+@media(max-width:600px){.np-user-brochure-banner{align-items:flex-start;flex-direction:column}.np-member-poster-card,.np-member-review-card{padding:20px}}
