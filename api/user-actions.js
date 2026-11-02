@@ -53,6 +53,19 @@ export default async function handler(req, res) {
     }
     const reference = "NP" + randomUUID().replace(/-/g, "").slice(0, 16).toUpperCase();
 
+    if (action === "website-review-submit") {
+      const message = String(req.body?.message || "").trim().slice(0, 1000);
+      if (message.length < 10) fail("Please write at least 10 characters for your review.");
+      const saved = await sql`INSERT INTO website_feedback (user_id, message, status)
+        SELECT ${profile.novopay_id}, ${message}, 'submitted'
+        WHERE NOT EXISTS (SELECT 1 FROM website_feedback WHERE user_id=${profile.novopay_id})
+        RETURNING id, created_at`;
+      if (!saved[0]) fail("You have already submitted your website review.", 409);
+      await sql`INSERT INTO audit_logs(actor_uid,action,entity_type,entity_id,details)
+        VALUES (${decoded.uid},'website_review_submitted','website_feedback',${String(saved[0].id)},jsonb_build_object('user_id',${profile.novopay_id}))`;
+      return res.status(201).json({ ok: true, message: "Thank you. Your website review has been submitted.", review: saved[0] });
+    }
+
     if (action === "update-profile") {
       const rawMobile = String(req.body?.mobile || "").trim();
       let mobile = rawMobile.replace(/\\D/g, "");
