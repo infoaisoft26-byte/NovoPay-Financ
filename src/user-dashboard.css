@@ -340,3 +340,5 @@ html,body,#root{width:100%;min-width:0;max-width:100%;margin:0}
 .np-user-brochure-banner{display:flex;align-items:center;justify-content:space-between;gap:16px;margin:18px 0;padding:17px 19px;border:1px solid rgba(190,151,76,.35);border-radius:15px;background:linear-gradient(110deg,rgba(185,151,80,.12),rgba(15,23,42,.04))}
 .np-user-brochure-banner>div{display:grid;gap:5px}.np-user-brochure-banner b{color:#f8fafc}.np-user-brochure-banner small{color:#94a3b8}.np-user-brochure-banner a{display:inline-flex;align-items:center;gap:8px;white-space:nowrap;padding:10px 14px;border-radius:9px;background:#d4af62;color:#111827;font-weight:800;text-decoration:none}
 @media(max-width:600px){.np-user-brochure-banner{align-items:flex-start;flex-direction:column}.np-member-poster-card,.np-member-review-card{padding:20px}}
+
+.np-member-review-rating{display:grid;gap:7px;margin:14px 0;color:#e2e8f0;font-size:13px;font-weight:700}.np-member-review-rating select{width:100%;padding:11px 12px;border:1px solid #475569;border-radius:10px;background:#0b1220;color:#f8fafc;font:inherit}
