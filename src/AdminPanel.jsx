@@ -103,7 +103,7 @@ function recordCells(section, row) {
     case "Packages": return [row.name || "—", row.package_type || "—", amount(row.price, row.currency), (row.roi_rate == null ? "—" : row.roi_rate + "%") + " · " + (row.duration_days == null ? "—" : row.duration_days + " days"), row.status || "—"];
     case "Package Activations": return [row.reference || "—", row.user_id || "—", row.package_name || row.package_id || "Package", amount(row.amount, row.currency), row.status || "—"];
     case "Support Tickets": return [row.reference || row.id || "—", row.user_id || "—", row.subject || "Support request", row.status || "open", stamp(row.created_at || row.updated_at)];
-    case "Website Feedback": return [row.id || "—", row.user_id || "Anonymous", row.rating == null ? "—" : row.rating + "/5", row.message || "—", stamp(row.created_at)];
+    case "Website Feedback": return [row.id || "—", row.user_id || "Anonymous", row.message || "—", row.status || "new", stamp(row.created_at)];
     case "Survey Responses": return [row.id || "—", row.user_id || "—", row.survey_key || "Survey", row.status || "submitted", JSON.stringify(row.response || {})];
     case "Audit Logs": return [row.id || "—", row.actor_uid || "System", row.action || "—", (row.entity_type || "record") + " · " + (row.entity_id || "—"), stamp(row.created_at)];
     case "Offer Posters": return [row.id || "—", row.title || "—", row.status || "draft", row.image_url || "—", stamp(row.updated_at || row.created_at)];
@@ -132,7 +132,7 @@ const tableColumns = {
   "Monthly Income Report": ["MONTH (IST)", "INCOME CATEGORY", "TOTAL CREDITED", "ENTRIES"],
   "Income Leaderboard": ["RANK", "NOVOPAY ID", "MEMBER", "TOTAL INVESTMENT", "DIRECTS", "TOTAL TEAM", "LEVEL-WISE TEAM (L1–L15)"],
   "Support Tickets": ["TICKET REF", "USER ID", "SUBJECT", "STATUS", "LAST UPDATED"],
-  "Website Feedback": ["FEEDBACK ID", "USER", "RATING", "MESSAGE", "SUBMITTED"],
+  "Website Feedback": ["FEEDBACK ID", "USER", "REVIEW", "STATUS", "SUBMITTED"],
   "Survey Responses": ["RESPONSE ID", "USER ID", "SURVEY", "STATUS", "RESPONSE DETAILS"],
   "Audit Logs": ["EVENT ID", "ADMIN / ACTOR", "ACTION", "ENTITY", "DATE / TIME"],
   "Offer Posters": ["POSTER ID", "TITLE", "STATUS", "IMAGE", "UPDATED"],
