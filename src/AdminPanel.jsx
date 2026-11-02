@@ -379,7 +379,7 @@ export default function AdminPanel({ user, onLogout }) {
     } else if (section === "Support Tickets" && !["closed", "resolved"].includes(row.status)) {
       actions.push(["support-status", "Resolve ticket", "success"], ["support-status", "Close ticket", "danger"]);
     } else if (section === "Offer Posters") {
-      actions.push(["poster-status", row.status === "published" ? "Unpublish poster" : "Publish poster", row.status === "active" ? "danger" : "success"]);
+      actions.push(["poster-status", row.status === "published" ? "Unpublish poster" : "Publish poster", row.status === "published" ? "danger" : "success"]);
     } else if (section === "Packages") {
       actions.push(["package-status", row.status === "active" ? "Pause package" : "Activate package", row.status === "active" ? "danger" : "success"]);
     }
