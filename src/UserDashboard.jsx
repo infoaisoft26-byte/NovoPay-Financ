@@ -117,6 +117,11 @@ export default function UserDashboard({ user, onLogout }) {
   const [actionMessage, setActionMessage] = useState("");
   const [depositPopup, setDepositPopup] = useState(null);
   const [activationPopup, setActivationPopup] = useState(null);
+  const [posterPopup, setPosterPopup] = useState(null);
+  const [reviewPopup, setReviewPopup] = useState(false);
+  const [reviewText, setReviewText] = useState("");
+  const [reviewBusy, setReviewBusy] = useState(false);
+  const loginPromptsHandled = useRef(false);
   const previousDepositStatuses = useRef(null);
   const [depositAmount, setDepositAmount] = useState("2");
   const [txHash, setTxHash] = useState("");
@@ -173,6 +178,11 @@ export default function UserDashboard({ user, onLogout }) {
         }
       }
       setData(result);
+      if (section === "overview" && !loginPromptsHandled.current) {
+        loginPromptsHandled.current = true;
+        if (result.activePoster?.image_url) setPosterPopup(result.activePoster);
+        else if (!result.hasReviewed) setReviewPopup(true);
+      }
       setLastUpdated(new Date());
     } catch (err) {
       setData(null);
@@ -322,6 +332,28 @@ export default function UserDashboard({ user, onLogout }) {
     }
   }
 
+  async function submitWebsiteReview(event) {
+    event.preventDefault();
+    if (reviewBusy) return;
+    setReviewBusy(true); setActionMessage("");
+    try {
+      const token = await user.getIdToken();
+      const response = await fetch("/api/user-actions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: "Bearer " + token },
+        body: JSON.stringify({ action: "website-review-submit", message: reviewText })
+      });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(payload.error || "Your review could not be submitted.");
+      setReviewPopup(false);
+      setReviewText("");
+      setData(current => current ? { ...current, hasReviewed: true } : current);
+      setActionMessage("Thank you for sharing your website review.");
+    } catch (error) {
+      setActionMessage(error.message || "Your review could not be submitted.");
+    } finally { setReviewBusy(false); }
+  }
+
   function chooseSection(next) {
     setSection(next);
     setQuery("");
@@ -330,6 +362,25 @@ export default function UserDashboard({ user, onLogout }) {
 
   return (
     <main className="np-user-shell">
+      {posterPopup && <div className="np-member-poster-backdrop" role="dialog" aria-modal="true" aria-label="NovoPay announcement">
+        <section className="np-member-poster-card">
+          <button type="button" className="np-member-poster-close" aria-label="Close poster" onClick={()=>{setPosterPopup(null);if(data && !data.hasReviewed)setReviewPopup(true);}}>×</button>
+          <p className="np-user-eyebrow">NOVOPAY FINANCE · ANNOUNCEMENT</p>
+          <h2>{posterPopup.title || "Important Announcement"}</h2>
+          <img src={posterPopup.image_url} alt={posterPopup.title || "NovoPay announcement"} />
+          <button type="button" className="np-member-poster-confirm" onClick={()=>{setPosterPopup(null);if(data && !data.hasReviewed)setReviewPopup(true);}}>Continue to Dashboard</button>
+        </section>
+      </div>}
+      {reviewPopup && <div className="np-member-review-backdrop" role="dialog" aria-modal="true" aria-label="Website review">
+        <form className="np-member-review-card" onSubmit={submitWebsiteReview}>
+          <p className="np-user-eyebrow">YOUR FEEDBACK MATTERS</p>
+          <h2>How is your NovoPay experience?</h2>
+          <p>Share your feedback once. After submission, this prompt will not appear again.</p>
+          <textarea required minLength={10} maxLength={1000} value={reviewText} onChange={e=>setReviewText(e.target.value)} placeholder="Write your website review (at least 10 characters)…"/>
+          {actionMessage && <small role="status">{actionMessage}</small>}
+          <div><button type="button" className="np-member-review-later" onClick={()=>setReviewPopup(false)}>Later</button><button type="submit" disabled={reviewBusy || reviewText.trim().length<10}>{reviewBusy ? "Submitting…" : "Submit Review"}</button></div>
+        </form>
+      </div>}
       {activationPopup && <div className="np-activation-modal-backdrop" role="dialog" aria-live="assertive" aria-modal="true">
         <section className="np-activation-modal">
           <div className="np-activation-confetti" aria-hidden="true"><span>✦</span><span>✧</span><span>✦</span><span>✧</span><span>✦</span></div>
@@ -396,6 +447,7 @@ export default function UserDashboard({ user, onLogout }) {
                 <div><span className="np-user-welcome-icon"><Wallet size={21} /></span><p>ACCOUNT STATUS</p><h2>{profile?.status ? profile.status[0].toUpperCase() + profile.status.slice(1) : loading ? "Loading…" : "Profile pending"}</h2><small>{profile?.novopay_id ? `NovoPay ID: ${profile.novopay_id}` : "Your account details will appear after profile setup."}</small></div>
                 <div className="np-user-welcome-right"><ShieldCheck size={28} /><span>Private member area</span><small>Only your authenticated account data</small></div>
               </div>
+              {data?.brochureUrl && <section className="np-user-brochure-banner"><div><b>Official NovoPay Brochure</b><small>Latest company information and package details, available anytime.</small></div><a href={data.brochureUrl} target="_blank" rel="noreferrer"><Download size={16}/> Open Brochure</a></section>}
               <div className="np-user-action-shortcuts">
                 <Quick icon={ArrowDownLeft} label="Recharge Fund" onClick={() => chooseSection("deposits")} />
                 <Quick icon={Package} label="Basic Package" onClick={() => chooseSection("basic-package")} />
@@ -588,7 +640,15 @@ function Records({ rows, type, loading }) {
     }
     if (key === "created_at" || key === "activated_at") return date(row[key]);
     if (key === "referral_level") return row[key] ? "L" + row[key] : "—";
-    if (key === "status") return <span className={`np-user-status ${statusClass(row[key])}`}>{row[key] || "unknown"}</span>;
+    if (key === "status") {
+      const displayStatus = type === "transactions" && String(row.type || "").toLowerCase() === "deposit_credit" && String(row[key] || "").toLowerCase() === "posted" ? "Credited" : (row[key] || "unknown");
+      return <span className={`np-user-status ${statusClass(row[key])}`}>{displayStatus}</span>;
+    }
+    if (key === "type") {
+      const raw = String(row[key] || "");
+      const labels = { deposit_credit: "Fund Deposit", package_purchase: "Package Purchase", withdrawal_request: "Fund Withdrawal", withdrawal_refund: "Withdrawal Refund", income_to_fund: "Income to Fund" };
+      return <span>{labels[raw.toLowerCase()] || raw.replace(/_/g, " ").replace(/\b\w/g, c => c.toUpperCase()) || "—"}</span>;
+    }
     return <span className={["reference", "source_member_id", "novopay_id"].includes(key) ? "np-user-ref" : ""}>{row[key] ?? "—"}</span>;
   }
 

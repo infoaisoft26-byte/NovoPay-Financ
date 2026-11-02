@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   LayoutDashboard, Users, ArrowDownToLine, ArrowUpFromLine, ReceiptText,
   Package, ChartNoAxesCombined, Settings, Search, Bell, Menu, X, ShieldCheck,
@@ -98,12 +98,12 @@ function recordCells(section, row) {
     case "KYC Approvals": return [row.reference || row.id || "—", row.user_id || "—", row.document_type || "Document", row.status || "pending", stamp(row.created_at || row.reviewed_at)];
     case "Deposits": return [row.reference || "—", row.user_id || "—", amount(row.amount, row.currency), row.status || "pending", row.blockchain_verified ? "Blockchain verified · Ready for approval" : "Awaiting blockchain verification", row.tx_hash || "TX hash not submitted"];
     case "Withdrawals": return [row.reference || "—", row.user_id || "—", amount(row.amount, row.currency), "Fee " + amount(row.fee, row.currency) + " · Net " + amount(row.net_amount, row.currency), row.status || "pending"];
-    case "Transactions": return [row.reference || "—", row.user_id || "—", row.type || "—", amount(row.amount, row.currency), row.status || "—"];
+    case "Transactions": { const type = String(row.type || ""); const label = type.toLowerCase() === "deposit_credit" ? "Fund Deposit" : type.replace(/_/g, " ").replace(/\\b\\w/g, c => c.toUpperCase()); const status = type.toLowerCase() === "deposit_credit" && String(row.status || "").toLowerCase() === "posted" ? "Credited" : (row.status || "—"); return [row.reference || "—", row.user_id || "—", label || "—", amount(row.amount, row.currency), status]; }
     case "P2P Transfers": return [row.reference || "—", row.sender_user_id || "—", row.receiver_user_id || "—", amount(row.amount, row.currency), row.status || "—"];
     case "Packages": return [row.name || "—", row.package_type || "—", amount(row.price, row.currency), (row.roi_rate == null ? "—" : row.roi_rate + "%") + " · " + (row.duration_days == null ? "—" : row.duration_days + " days"), row.status || "—"];
     case "Package Activations": return [row.reference || "—", row.user_id || "—", row.package_name || row.package_id || "Package", amount(row.amount, row.currency), row.status || "—"];
     case "Support Tickets": return [row.reference || row.id || "—", row.user_id || "—", row.subject || "Support request", row.status || "open", stamp(row.created_at || row.updated_at)];
-    case "Website Feedback": return [row.id || "—", row.user_id || "Anonymous", row.rating == null ? "—" : row.rating + "/5", row.message || "—", stamp(row.created_at)];
+    case "Website Feedback": return [row.id || "—", row.user_id || "Anonymous", row.message || "—", row.status || "new", stamp(row.created_at)];
     case "Survey Responses": return [row.id || "—", row.user_id || "—", row.survey_key || "Survey", row.status || "submitted", JSON.stringify(row.response || {})];
     case "Audit Logs": return [row.id || "—", row.actor_uid || "System", row.action || "—", (row.entity_type || "record") + " · " + (row.entity_id || "—"), stamp(row.created_at)];
     case "Offer Posters": return [row.id || "—", row.title || "—", row.status || "draft", row.image_url || "—", stamp(row.updated_at || row.created_at)];
@@ -132,7 +132,7 @@ const tableColumns = {
   "Monthly Income Report": ["MONTH (IST)", "INCOME CATEGORY", "TOTAL CREDITED", "ENTRIES"],
   "Income Leaderboard": ["RANK", "NOVOPAY ID", "MEMBER", "TOTAL INVESTMENT", "DIRECTS", "TOTAL TEAM", "LEVEL-WISE TEAM (L1–L15)"],
   "Support Tickets": ["TICKET REF", "USER ID", "SUBJECT", "STATUS", "LAST UPDATED"],
-  "Website Feedback": ["FEEDBACK ID", "USER", "RATING", "MESSAGE", "SUBMITTED"],
+  "Website Feedback": ["FEEDBACK ID", "USER", "REVIEW", "STATUS", "SUBMITTED"],
   "Survey Responses": ["RESPONSE ID", "USER ID", "SURVEY", "STATUS", "RESPONSE DETAILS"],
   "Audit Logs": ["EVENT ID", "ADMIN / ACTOR", "ACTION", "ENTITY", "DATE / TIME"],
   "Offer Posters": ["POSTER ID", "TITLE", "STATUS", "IMAGE", "UPDATED"],
@@ -144,6 +144,10 @@ export default function AdminPanel({ user, onLogout }) {
   const [query, setQuery] = useState("");
   const [lastRefresh, setLastRefresh] = useState(null);
   const [notice, setNotice] = useState("");
+  const [incomingAlert, setIncomingAlert] = useState(null);
+  const seenPendingRequests = useRef(null);
+  const [posterTitle, setPosterTitle] = useState("");
+  const [posterImage, setPosterImage] = useState("");
   const [rows, setRows] = useState([]);
   const [overviewCounts, setOverviewCounts] = useState(null);
   const [recentActivity, setRecentActivity] = useState([]);
@@ -219,9 +223,28 @@ export default function AdminPanel({ user, onLogout }) {
   }, [section, query, reloadKey, user]);
 
   useEffect(() => {
-    const interval = window.setInterval(() => setReloadKey(value => value + 1), 15000);
-    return () => window.clearInterval(interval);
-  }, []);
+    let stopped = false;
+    const pollAdminRequests = async () => {
+      try {
+        const token = await user.getIdToken();
+        const response = await fetch("/api/admin?section=overview", { headers: { Authorization: "Bearer " + token }, cache: "no-store" });
+        if (!response.ok) return;
+        const payload = await response.json();
+        const requests = Array.isArray(payload.pendingRequests) ? payload.pendingRequests : [];
+        if (stopped) return;
+        const keys = requests.map(row => String(row.kind) + ":" + String(row.reference));
+        if (seenPendingRequests.current) {
+          const known = new Set(seenPendingRequests.current);
+          const fresh = requests.find(row => !known.has(String(row.kind) + ":" + String(row.reference)));
+          if (fresh) setIncomingAlert(fresh);
+        }
+        seenPendingRequests.current = keys;
+      } catch { /* Retry on the next poll without interrupting the admin workspace. */ }
+    };
+    pollAdminRequests();
+    const interval = window.setInterval(() => { pollAdminRequests(); setReloadKey(value => value + 1); }, 15000);
+    return () => { stopped = true; window.clearInterval(interval); };
+  }, [user]);
 
   function startNewPackage() {
     setPackageForm({ ...blankPackage, package_code: "BASIC_" + Date.now().toString().slice(-6) });
@@ -271,6 +294,26 @@ export default function AdminPanel({ user, onLogout }) {
     }
   }
 
+  async function savePoster(event) {
+    event.preventDefault();
+    if (!posterTitle.trim() || !posterImage) { setDataError("Enter a poster title and choose an image."); return; }
+    setActionBusy("poster-save"); setDataError(""); setNotice("");
+    try {
+      const token = await user.getIdToken();
+      const response = await fetch("/api/admin-actions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: "Bearer " + token },
+        body: JSON.stringify({ action: "save-poster", title: posterTitle.trim(), image_url: posterImage })
+      });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(payload.error || "Poster could not be published.");
+      setPosterTitle(""); setPosterImage("");
+      setNotice("Poster published. It will appear to members when they sign in.");
+      setReloadKey(value => value + 1);
+    } catch (error) { setDataError(error.message || "Poster could not be published."); }
+    finally { setActionBusy(""); }
+  }
+
   async function savePlatformSettings() {
     setActionBusy("save-settings"); setDataError(""); setNotice("");
     try {
@@ -312,7 +355,7 @@ export default function AdminPanel({ user, onLogout }) {
       const response = await fetch("/api/admin-actions", {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: "Bearer " + token },
-        body: JSON.stringify({ action, reference: row.reference, id: row.novopay_id || row.id, status: action.endsWith("-status") ? (label.toLowerCase().includes("approve") ? "approved" : label.toLowerCase().includes("reject") ? "rejected" : label.toLowerCase().includes("suspend") ? "suspended" : label.toLowerCase().includes("activate") ? "active" : label.toLowerCase().includes("pause") ? "paused" : label.toLowerCase().includes("close") ? "closed" : label.toLowerCase().includes("resolve") ? "resolved" : "active") : undefined })
+        body: JSON.stringify({ action, reference: row.reference, id: row.novopay_id || row.id, status: action === "poster-status" ? (label.toLowerCase().includes("unpublish") ? "draft" : "published") : action.endsWith("-status") ? (label.toLowerCase().includes("approve") ? "approved" : label.toLowerCase().includes("reject") ? "rejected" : label.toLowerCase().includes("suspend") ? "suspended" : label.toLowerCase().includes("activate") ? "active" : label.toLowerCase().includes("pause") ? "paused" : label.toLowerCase().includes("close") ? "closed" : label.toLowerCase().includes("resolve") ? "resolved" : "active") : undefined })
       });
       const payload = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(payload.error || "Admin action could not be completed.");
@@ -335,6 +378,8 @@ export default function AdminPanel({ user, onLogout }) {
       actions.push(["user-status", row.status === "suspended" ? "Activate user" : "Suspend user", row.status === "suspended" ? "success" : "danger"]);
     } else if (section === "Support Tickets" && !["closed", "resolved"].includes(row.status)) {
       actions.push(["support-status", "Resolve ticket", "success"], ["support-status", "Close ticket", "danger"]);
+    } else if (section === "Offer Posters") {
+      actions.push(["poster-status", row.status === "published" ? "Unpublish poster" : "Publish poster", row.status === "published" ? "danger" : "success"]);
     } else if (section === "Packages") {
       actions.push(["package-status", row.status === "active" ? "Pause package" : "Activate package", row.status === "active" ? "danger" : "success"]);
     }
@@ -394,6 +439,15 @@ export default function AdminPanel({ user, onLogout }) {
             <div><p className="np-admin-eyebrow">NOVOPAY FINANCE / ADMIN CONTROL DESK</p><h1>{section}</h1><p className="np-admin-subtitle">{descriptions[section]}</p></div>
             {["Reports", "Income Reports", "Transactions", "Deposits", "Withdrawals", "Package Activations"].includes(section) && <button className="np-admin-refresh" onClick={() => window.print()}><Download size={16}/> Download PDF</button>}<button className="np-admin-refresh" onClick={requestRefresh}><RefreshCw size={16}/> Refresh</button>
           </div>
+          {incomingAlert && <div className="np-admin-alert-backdrop" role="dialog" aria-modal="true">
+            <section className="np-admin-alert-card">
+              <span className="np-admin-alert-kicker">NEW MEMBER REQUEST</span>
+              <h2>{incomingAlert.kind === "deposit" ? "New Fund Deposit" : incomingAlert.kind === "withdrawal" ? "New Withdrawal Request" : "New Package Purchase"}</h2>
+              <p>{incomingAlert.user_id || "Member"} · {Number(incomingAlert.amount || 0).toFixed(2)} {incomingAlert.currency || "USDT"}</p>
+              <small>Reference: {incomingAlert.reference}</small>
+              <div><button className="np-admin-action-button" onClick={()=>setIncomingAlert(null)}>Dismiss</button><button className="np-admin-action-button success" onClick={()=>{setSection(incomingAlert.kind==="deposit"?"Deposits":incomingAlert.kind==="withdrawal"?"Withdrawals":"Package Activations");setIncomingAlert(null);setQuery("");}}>Review request</button></div>
+            </section>
+          </div>}
           {notice && <div className="np-admin-notice" role="status"><CircleHelp size={17}/><span>{notice}</span><button onClick={() => setNotice("")} aria-label="Dismiss"><X size={16}/></button></div>}
           {dataError.includes("Admin server permission is not set") && <div className="np-admin-inline-error" role="alert"><ShieldAlert size={17}/><span>Admin permission setup is required for this Firebase account.</span><button className="np-admin-refresh" disabled={settingUpAdmin} onClick={async () => { setSettingUpAdmin(true); setDataError(""); try { const token = await user.getIdToken(true); const response = await fetch("/api/setup-admin", { method: "POST", headers: { Authorization: "Bearer " + token } }); const payload = await response.json().catch(() => ({})); if (!response.ok) throw new Error(payload.error || "Admin setup could not be completed."); await user.getIdToken(true); setDataError(""); setNotice("Admin access setup complete. Loading your admin records."); setReloadKey(value => value + 1); } catch (error) { setDataError(error.message || "Admin setup could not be completed."); } finally { setSettingUpAdmin(false); } }}>{settingUpAdmin ? "Setting up…" : "Set up admin access"}</button></div>}
 
@@ -487,10 +541,17 @@ export default function AdminPanel({ user, onLogout }) {
             <div className="np-admin-data-toolbar"><div className="np-admin-data-title"><span className="np-admin-stat-icon"><ActiveIcon size={19}/></span><div><h3>{section} management</h3><p>{descriptions[section]}</p></div></div>
               <label className="np-admin-search"><Search size={16}/><input value={query} onChange={e => setQuery(e.target.value)} placeholder={section === "Users" ? "Search by email or NovoPay ID" : "Search records"} /></label>
             </div>
+            {section === "Offer Posters" && <form className="np-admin-poster-upload" onSubmit={savePoster}>
+              <div><b>Publish a login poster</b><small>Active posters appear to members when they sign in. Use PNG, JPG, WEBP or GIF up to 2 MB.</small></div>
+              <label>Poster title<input required maxLength={120} value={posterTitle} onChange={e=>setPosterTitle(e.target.value)} placeholder="Welcome / Special announcement"/></label>
+              <label>Poster image<input required type="file" accept="image/png,image/jpeg,image/webp,image/gif" onChange={e=>{const file=e.target.files?.[0];if(!file)return;if(file.size>2*1024*1024){setDataError("Poster image must be 2 MB or smaller.");e.target.value="";return;}const reader=new FileReader();reader.onload=()=>setPosterImage(String(reader.result||""));reader.onerror=()=>setDataError("Poster image could not be read.");reader.readAsDataURL(file);}}/></label>
+              {posterImage && <img className="np-admin-poster-upload-preview" src={posterImage} alt="Poster upload preview"/>}
+              <button className="np-admin-action-button success" type="submit" disabled={actionBusy==="poster-save"}>{actionBusy==="poster-save" ? "Publishing…" : "Publish to all users"}</button>
+            </form>}
             {section === "Packages" && <div className="np-admin-package-summary"><span><b>{rows.filter(row=>row.status==="active" && row.package_type==="basic").length}</b> Active Basic Plans</span><span><b>{rows.filter(row=>row.status==="active" && row.package_type==="fd").length}</b> Active FD Plans</span><span><b>Simple daily return</b> Calculation Mode</span></div>}
             <div className="np-admin-table-head">{(tableColumns[section] || ["RECORD", "STATUS", "DETAILS"]).map(col => <span key={col}>{col}</span>)}</div>
             {dataError && <div className="np-admin-inline-error" role="status"><ShieldAlert size={17}/><span>{dataError}</span></div>}
-            {loadingData ? <div className="np-admin-empty np-admin-section-empty"><RefreshCw size={22}/><b>Loading NovoPay records…</b><p>Reading from the authenticated admin API.</p></div> : rows.length ? <div className="np-admin-record-list">{rows.map((row, index) => <div className={`np-admin-record-row ${rowActions(row).length ? "has-actions" : ""} ${section === "Support Tickets" ? "np-support-row" : ""} ${section === "Website Feedback" ? "np-review-row" : ""} ${section === "Offer Posters" ? "np-poster-row" : ""} ${section === "Income Leaderboard" ? "np-leaderboard-row" : ""}`} key={row.id || row.reference || index}>{recordCells(section, row).map((cell, cellIndex) => section === "Offer Posters" && cellIndex === 3 && /^https?:\/\//i.test(String(cell || "")) ? <span className="np-poster-preview-cell" key={cellIndex}><img src={String(cell)} alt="Poster preview" loading="lazy" onError={e => { e.currentTarget.style.display = "none"; }}/><a href={String(cell)} target="_blank" rel="noreferrer">View artwork</a></span> : section === "Website Feedback" && cellIndex === 2 ? <span className="np-review-rating" key={cellIndex} title={`${cell} rating`}>{"★".repeat(Math.max(0, Math.min(5, Number.parseInt(cell, 10) || 0)))}<small>{cell}</small></span> : <span key={cellIndex} title={String(cell ?? "")}>{cell == null || cell === "" ? "—" : String(cell)}</span>)}{section === "Packages" && <button className="np-admin-action-button" disabled={!!actionBusy} onClick={()=>{ if (window.confirm("Edit this package definition? Changes to ROI or duration may affect currently active packages. Existing wallet credits will not be changed.")) startEditPackage(row); }}><Pencil size={14}/> Edit</button>}{rowActions(row).length > 0 && <div className="np-admin-row-actions">{rowActions(row).map(([action, label, kind]) => <button key={action + label} className={`np-admin-action-button ${kind}`} disabled={!!actionBusy} onClick={() => runAdminAction(action, row, label)}>{actionBusy === action + ":" + (row.reference || row.id || row.novopay_id || "") ? "Working…" : label}</button>)}</div>}</div>)}</div> : <div className="np-admin-empty np-admin-section-empty"><span className="np-admin-empty-icon"><ActiveIcon size={22}/></span><b>{dataError ? "Records unavailable" : emptyTitles[section] || "No records available"}</b><p>{dataError ? "Resolve the backend configuration or admin permission message above, then refresh." : query ? "No records matched this search." : "No records exist in this section yet. No sample financial records are invented."}</p></div>}
+            {loadingData ? <div className="np-admin-empty np-admin-section-empty"><RefreshCw size={22}/><b>Loading NovoPay records…</b><p>Reading from the authenticated admin API.</p></div> : rows.length ? <div className="np-admin-record-list">{rows.map((row, index) => <div className={`np-admin-record-row ${rowActions(row).length ? "has-actions" : ""} ${section === "Support Tickets" ? "np-support-row" : ""} ${section === "Website Feedback" ? "np-review-row" : ""} ${section === "Offer Posters" ? "np-poster-row" : ""} ${section === "Income Leaderboard" ? "np-leaderboard-row" : ""}`} key={row.id || row.reference || index}>{recordCells(section, row).map((cell, cellIndex) => section === "Offer Posters" && cellIndex === 3 && /^(https?:\/\/|data:image\/)/i.test(String(cell || "")) ? <span className="np-poster-preview-cell" key={cellIndex}><img src={String(cell)} alt="Poster preview" loading="lazy" onError={e => { e.currentTarget.style.display = "none"; }}/><a href={String(cell)} target="_blank" rel="noreferrer">View artwork</a></span> : false && section === "Website Feedback" && cellIndex === 2 ? <span className="np-review-rating" key={cellIndex} title={`${cell} rating`}>{"★".repeat(Math.max(0, Math.min(5, Number.parseInt(cell, 10) || 0)))}<small>{cell}</small></span> : <span key={cellIndex} title={String(cell ?? "")}>{cell == null || cell === "" ? "—" : String(cell)}</span>)}{section === "Packages" && <button className="np-admin-action-button" disabled={!!actionBusy} onClick={()=>{ if (window.confirm("Edit this package definition? Changes to ROI or duration may affect currently active packages. Existing wallet credits will not be changed.")) startEditPackage(row); }}><Pencil size={14}/> Edit</button>}{rowActions(row).length > 0 && <div className="np-admin-row-actions">{rowActions(row).map(([action, label, kind]) => <button key={action + label} className={`np-admin-action-button ${kind}`} disabled={!!actionBusy} onClick={() => runAdminAction(action, row, label)}>{actionBusy === action + ":" + (row.reference || row.id || row.novopay_id || "") ? "Working…" : label}</button>)}</div>}</div>)}</div> : <div className="np-admin-empty np-admin-section-empty"><span className="np-admin-empty-icon"><ActiveIcon size={22}/></span><b>{dataError ? "Records unavailable" : emptyTitles[section] || "No records available"}</b><p>{dataError ? "Resolve the backend configuration or admin permission message above, then refresh." : query ? "No records matched this search." : "No records exist in this section yet. No sample financial records are invented."}</p></div>}
           </section>}
           <footer className="np-admin-footer"><span>© {new Date().getFullYear()} NovoPay Finance</span><span><ShieldCheck size={14}/> Independent admin workspace</span>{lastRefresh && <span>Refresh requested at {lastRefresh}</span>}</footer>
         </div>

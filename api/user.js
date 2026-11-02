@@ -278,7 +278,7 @@ export default async function handler(req, res) {
     const platformRows = await db`SELECT setting_value FROM system_settings WHERE setting_key='platform' LIMIT 1`;
     const platformSettings = platformRows[0]?.setting_value || {};
     const depositAddress = String(platformSettings.depositAddress || process.env.NOVOPAY_BEP20_DEPOSIT_ADDRESS || "0xBF2bfe77a6Fc846cF9881A5A93508c7D5d6658b3").trim();
-    const brochureUrl = section === "brochure" ? String(platformSettings.brochurePdfUrl || process.env.NOVOPAY_BROCHURE_URL || "").trim() : "";
+    const brochureUrl = ["overview", "brochure"].includes(section) ? String(platformSettings.brochurePdfUrl || process.env.NOVOPAY_BROCHURE_URL || "").trim() : "";
     const publicPlatformSettings = { ...platformSettings, brochurePdfUrl: "" };
     const maintenanceMode = platformSettings.maintenanceMode === true;
     if (maintenanceMode && decoded.admin !== true) return res.status(503).json({ error: "NovoPay Finance is temporarily under maintenance. Please try again later.", maintenanceMode: true });
@@ -315,7 +315,7 @@ export default async function handler(req, res) {
     }
 
     if (section === "overview") {
-      const [recentTransactions, pendingDeposits, pendingWithdrawals, activePackages, activations, incomeLedger, sponsorRows, packageRows, countedIncomeRows] = await Promise.all([
+      const [recentTransactions, pendingDeposits, pendingWithdrawals, activePackages, activations, incomeLedger, sponsorRows, packageRows, countedIncomeRows, posterRows, reviewRows] = await Promise.all([
         db`SELECT id, reference, type, amount, currency, status, description, created_at FROM ledger_transactions WHERE user_id = ${profile.novopay_id} ORDER BY created_at DESC LIMIT 5`,
         db`SELECT count(*)::int AS count FROM deposits WHERE user_id = ${profile.novopay_id} AND status = 'pending'`,
         db`SELECT count(*)::int AS count FROM withdrawals WHERE user_id = ${profile.novopay_id} AND status = 'pending'`,
@@ -336,6 +336,8 @@ export default async function handler(req, res) {
           lower(type) LIKE '%income%' OR lower(type) LIKE '%roi%' OR lower(type) LIKE '%level%' OR lower(type) LIKE '%joining%' OR lower(type) LIKE '%retopup%' OR lower(type) LIKE '%bonus%' OR lower(type) LIKE '%principal_return%'
           OR lower(description) LIKE '%income%' OR lower(description) LIKE '%roi%' OR lower(description) LIKE '%level%' OR lower(description) LIKE '%joining%' OR lower(description) LIKE '%retopup%' OR lower(description) LIKE '%bonus%' OR lower(description) LIKE '%principal return%'
         )`,
+        db`SELECT id, title, image_url, created_at FROM offer_posters WHERE lower(status)='published' AND (starts_at IS NULL OR starts_at<=now()) AND (ends_at IS NULL OR ends_at>now()) ORDER BY created_at DESC LIMIT 1`,
+        db`SELECT id FROM website_feedback WHERE user_id=${profile.novopay_id} LIMIT 1`,
       ]);
       const eligibleActivations = activations.filter(row => ['active','completed','approved'].includes(String(row.status || '').toLowerCase()));
       const recordedInvestment = eligibleActivations.reduce((sum,row)=>sum+Number(row.amount || 0),0);
@@ -359,7 +361,7 @@ export default async function handler(req, res) {
       const totalCap = recordedInvestment * 5;
       return res.status(200).json({
         ok: true, section, user: profile, rows: recentTransactions, recentTransactions, depositAddress, brochureUrl, maintenanceMode, platformSettings: publicPlatformSettings,
-        activations, packages: visiblePackages, levelIncome, sponsor: sponsorRows[0] || null,
+        activations, packages: visiblePackages, levelIncome, sponsor: sponsorRows[0] || null,\n        activePoster: posterRows[0] || null, hasReviewed: reviewRows.length > 0,
         capping: { recordedInvestment, totalCap, countedIncome, remainingCap: Math.max(0, totalCap - countedIncome) },
         summary: { pendingDeposits: pendingDeposits[0]?.count ?? 0, pendingWithdrawals: pendingWithdrawals[0]?.count ?? 0, activePackages: activePackages[0]?.count ?? 0 },
         incomeSummary: { totalIncome: countedIncome, totalInvestment: recordedInvestment },

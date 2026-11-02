@@ -203,7 +203,7 @@ export default async function handler(req, res) {
       return res.status(200).json({ ok: true, section, settings: saved[0]?.setting_value || {}, updatedAt: saved[0]?.updated_at || null });
     }
     if (section === "overview") {
-      const [counts, recentActivity] = await Promise.all([
+      const [counts, recentActivity, pendingRequests] = await Promise.all([
         Promise.all([
           db`SELECT count(*)::int AS count FROM users`,
           db`SELECT count(*)::int AS count FROM deposits WHERE status = 'pending'`,
@@ -215,6 +215,12 @@ export default async function handler(req, res) {
           db`SELECT count(*)::int AS count FROM audit_logs`,
         ]),
         db`SELECT id, reference, user_id, type, amount, currency, status, description, created_at FROM ledger_transactions ORDER BY created_at DESC LIMIT 8`,
+        db`SELECT 'deposit'::text AS kind, reference, user_id, amount, currency, status, created_at FROM deposits WHERE lower(status)='pending'
+          UNION ALL
+          SELECT 'withdrawal'::text AS kind, reference, user_id, amount, currency, status, created_at FROM withdrawals WHERE lower(status)='pending'
+          UNION ALL
+          SELECT 'package'::text AS kind, reference, user_id, amount, currency, status, created_at FROM package_activations WHERE created_at > now() - interval '30 minutes'
+          ORDER BY created_at DESC LIMIT 30`,
       ]);
       return res.status(200).json({
         ok: true,
