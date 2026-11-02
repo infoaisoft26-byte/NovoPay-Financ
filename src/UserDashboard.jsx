@@ -414,9 +414,9 @@ export default function UserDashboard({ user, onLogout }) {
                 {actionMessage && <p role="status">{actionMessage}</p>}
               </section>
               <section className="np-user-panel np-user-level-income">
-                <PanelTitle title="Level-wise Income Details" subtitle="Actual credited amounts from your income ledger. Levels with no matching credited entry show 0.00." />
+                <PanelTitle title="Level-wise Income Details" subtitle={`Actual credited ledger amounts · auto-refreshes every 15 seconds${lastUpdated ? ` · Updated ${lastUpdated.toLocaleTimeString()}` : ""}. Levels without a posted credit remain 0.00.`} />
                 <LevelIncome title="ROI Level Income" rate="L1 7% · L2–L15 1%" values={data?.levelIncome?.roi || {}} />
-                <LevelIncome title="Joining / First Deposit Level Income" rate="L1 5% · L2–L15 0.25%" values={data?.levelIncome?.joining || {}} />
+                <LevelIncome title="Joining / First Deposit Level Income" rate="L1 7% · L2–L15 0.25%" values={data?.levelIncome?.joining || {}} />
                 <LevelIncome title="Retopup Income" rate="L1 1% · L2–L15 0.25%" values={data?.levelIncome?.retopup || {}} />
                 <p className="np-user-income-note">Rates show the configured schedule, not a guaranteed return. Credits appear here only after they are recorded in the ledger.</p>
               </section>
