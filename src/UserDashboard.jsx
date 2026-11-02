@@ -376,7 +376,6 @@ export default function UserDashboard({ user, onLogout }) {
           <p className="np-user-eyebrow">YOUR FEEDBACK MATTERS</p>
           <h2>How is your NovoPay experience?</h2>
           <p>Share your feedback once. After submission, this prompt will not appear again.</p>
-          <label className="np-member-review-rating">Your rating<select value={reviewRating} onChange={e=>setReviewRating(Number(e.target.value))}><option value={5}>★★★★★ — Excellent</option><option value={4}>★★★★☆ — Good</option><option value={3}>★★★☆☆ — Average</option><option value={2}>★★☆☆☆ — Needs improvement</option><option value={1}>★☆☆☆☆ — Poor</option></select></label>
           <textarea required minLength={10} maxLength={1000} value={reviewText} onChange={e=>setReviewText(e.target.value)} placeholder="Write your website review (at least 10 characters)…"/>
           {actionMessage && <small role="status">{actionMessage}</small>}
           <div><button type="button" className="np-member-review-later" onClick={()=>setReviewPopup(false)}>Later</button><button type="submit" disabled={reviewBusy || reviewText.trim().length<10}>{reviewBusy ? "Submitting…" : "Submit Review"}</button></div>
