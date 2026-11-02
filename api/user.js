@@ -215,8 +215,9 @@ export default async function handler(req, res) {
       if (duplicateMobile[0]) return res.status(409).json({ error: "This mobile number is already registered. Please sign in to your existing account." });
       const sponsorRows = await db`SELECT novopay_id FROM users WHERE status = 'active' AND (upper(BTRIM(COALESCE(referral_code, ''))) = ${sponsorCode} OR upper(BTRIM(novopay_id)) = ${sponsorCode}) LIMIT 1`;
       if (!sponsorRows[0]) return res.status(400).json({ error: "Referral ID is invalid or inactive. Check the ID and try again." });
-      const generatedId = "NP" + randomUUID().replace(/-/g, "").slice(0, 18).toUpperCase();
-      await db`CREATE SEQUENCE IF NOT EXISTS novopay_referral_seq START WITH 503 INCREMENT BY 1`;
+      await db`CREATE SEQUENCE IF NOT EXISTS novopay_npf_referral_seq START WITH 501 INCREMENT BY 1`;
+      const nextReferralRows = await db`SELECT nextval('novopay_npf_referral_seq')::bigint AS next_id`;
+      const generatedId = 'NPF' + String(nextReferralRows[0].next_id).padStart(6, '0');
       const generatedReferral = generatedId; // One canonical NovoPay ID is also the member's referral ID.
       const rows = await db`WITH new_user AS (
           INSERT INTO users (auth_uid, novopay_id, referral_code, sponsor_user_id, full_name, email, mobile)
