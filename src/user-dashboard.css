@@ -274,3 +274,57 @@ html,body,#root{width:100%;min-width:0;max-width:100%;margin:0}
 .np-user-shell .np-user-stat:hover,.np-user-shell .np-user-panel:hover{box-shadow:0 12px 30px rgba(22,38,65,.08)}
 @keyframes npUserRise{from{opacity:0;transform:translateY(9px)}to{opacity:1;transform:translateY(0)}}
 @media(prefers-reduced-motion:reduce){.np-user-shell *{animation:none!important;transition:none!important;scroll-behavior:auto!important}}
+
+
+/* Premium, colorful package cards and darker readable member text */
+.np-user-shell{color:#111827}
+.np-user-shell .np-user-heading p,.np-user-shell .np-user-panel-title p,.np-user-shell .np-user-breadcrumb,.np-user-shell .np-user-top-left small,.np-user-shell .np-user-stat p,.np-user-shell .np-user-table td,.np-user-shell .np-user-empty p,.np-user-shell .np-user-package p,.np-user-shell .np-basic-plan-note p,.np-user-shell .np-basic-plan-metrics span,.np-user-shell .np-basic-plan-amount span,.np-user-shell .np-basic-plan-amount small,.np-user-shell .np-basic-plan-profit span{color:#475569}
+.np-user-shell .np-user-stat strong,.np-user-shell .np-user-panel-title h2,.np-user-shell .np-user-package h3,.np-user-shell .np-basic-plan-top h3,.np-user-shell .np-basic-plan-amount strong,.np-user-shell .np-basic-plan-profit strong{color:#111827}
+.np-user-shell .np-user-package-grid{gap:16px}
+.np-user-shell .np-color-package{overflow:hidden;border:1px solid #d9e2f2;border-radius:17px;padding:20px;box-shadow:0 8px 22px rgba(22,38,65,.07);transition:transform .22s ease,box-shadow .22s ease,border-color .22s ease}
+.np-user-shell .np-color-package:hover{transform:translateY(-5px);box-shadow:0 18px 36px rgba(22,38,65,.14);border-color:#8ca5ed}
+.np-user-shell .np-color-package .np-user-package-icon{width:46px;height:46px;border-radius:14px;background:rgba(255,255,255,.72);color:#233c92;box-shadow:0 4px 12px rgba(20,30,60,.08)}
+.np-user-shell .np-color-package h3{font-size:16px;font-weight:800;color:#101827;margin-top:9px}
+.np-user-shell .np-color-package>strong{display:block;font-size:23px;font-weight:800;color:#101827;margin-top:7px}
+.np-user-shell .np-color-package>p{font-size:12px;color:#334155;min-height:48px}
+.np-user-shell .np-color-package .np-user-eyebrow{color:#243b8a!important}
+.np-user-shell .np-color-package .np-user-status{border:1px solid rgba(255,255,255,.65)}
+.np-user-shell .np-color-package .np-user-package-terms{padding:10px 12px;border-radius:11px;background:rgba(255,255,255,.63);margin:12px 0}
+.np-user-shell .np-color-package .np-user-package-terms p{display:flex;justify-content:space-between;gap:10px;margin:7px 0;color:#334155;font-size:11px}
+.np-user-shell .np-color-package .np-user-package-terms b{color:#111827;text-align:right}
+.np-user-shell .np-color-package>button{width:100%;border:0;border-radius:10px;padding:12px 14px;background:#111d31;color:#fff;font-size:12px;font-weight:800;cursor:pointer;transition:transform .18s ease,box-shadow .18s ease}
+.np-user-shell .np-color-package>button:not(:disabled):hover{transform:translateY(-2px);box-shadow:0 9px 18px rgba(17,29,49,.22)}
+.np-user-shell .np-color-package>button:disabled{background:#64748b;color:#f8fafc;cursor:not-allowed}
+.np-user-shell .np-package-color-1{background:linear-gradient(145deg,#eef2ff 0%,#dbeafe 58%,#f8fafc 100%)}
+.np-user-shell .np-package-color-2{background:linear-gradient(145deg,#f3e8ff 0%,#e9d5ff 58%,#faf5ff 100%)}
+.np-user-shell .np-package-color-3{background:linear-gradient(145deg,#dcfce7 0%,#bbf7d0 58%,#f0fdf4 100%)}
+.np-user-shell .np-package-color-4{background:linear-gradient(145deg,#fef3c7 0%,#fde68a 58%,#fffbeb 100%)}
+.np-user-shell .np-basic-plan{position:relative;overflow:hidden;border-radius:17px;border:1px solid #dbe3f2;box-shadow:0 8px 22px rgba(22,38,65,.07);transition:transform .22s ease,box-shadow .22s ease}
+.np-user-shell .np-basic-plan:before{content:"";position:absolute;inset:0 0 auto;height:6px;background:linear-gradient(90deg,#4169e1,#8b5cf6,#ec4899)}
+.np-user-shell .np-basic-plan:hover{transform:translateY(-4px);box-shadow:0 18px 36px rgba(22,38,65,.13)}
+.np-user-shell .np-basic-plan-color-1{background:linear-gradient(145deg,#fff 0%,#eef2ff 100%)}
+.np-user-shell .np-basic-plan-color-2{background:linear-gradient(145deg,#fff 0%,#f3e8ff 100%)}
+.np-user-shell .np-basic-plan-color-3{background:linear-gradient(145deg,#fff 0%,#dcfce7 100%)}
+.np-user-shell .np-basic-plan-color-4{background:linear-gradient(145deg,#fff 0%,#fef3c7 100%)}
+.np-user-shell .np-basic-plan-note{background:rgba(255,255,255,.76);border:1px solid rgba(148,163,184,.2)}
+.np-user-shell .np-basic-purchase{background:linear-gradient(100deg,#1d4ed8,#6d28d9);box-shadow:0 7px 16px rgba(65,105,225,.2);transition:transform .18s ease,box-shadow .18s ease}
+.np-user-shell .np-basic-purchase:not(:disabled):hover{transform:translateY(-2px);box-shadow:0 11px 22px rgba(65,105,225,.3)}
+.np-user-shell .np-basic-purchase:disabled{background:#64748b;color:#fff}
+.np-activation-modal-backdrop{position:fixed;inset:0;z-index:10000;display:grid;place-items:center;padding:20px;background:rgba(7,15,33,.76);backdrop-filter:blur(7px);animation:npActivationFade .2s ease both}
+.np-activation-modal{position:relative;isolation:isolate;overflow:hidden;width:min(460px,100%);padding:34px 28px 28px;border:1px solid rgba(255,255,255,.75);border-radius:25px;background:linear-gradient(145deg,#fff 0%,#eef2ff 55%,#fdf2f8 100%);text-align:center;box-shadow:0 28px 90px rgba(0,0,0,.34);animation:npActivationPop .42s cubic-bezier(.2,.9,.25,1.2) both}
+.np-activation-check{position:relative;z-index:1;display:grid;place-items:center;width:74px;height:74px;margin:4px auto 15px;border-radius:50%;border:5px solid #fff;background:linear-gradient(145deg,#16a34a,#059669);color:#fff;font-size:38px;font-weight:900;box-shadow:0 9px 25px rgba(5,150,105,.28);animation:npActivationCheck .55s .12s ease both}
+.np-activation-kicker{position:relative;z-index:1;margin:0 0 7px;color:#4f46e5;font-size:10px;font-weight:900;letter-spacing:2px}
+.np-activation-modal h2{position:relative;z-index:1;margin:0 0 10px;color:#111827;font-size:25px;letter-spacing:-.7px}
+.np-activation-message{position:relative;z-index:1;margin:0 auto 18px;max-width:360px;color:#334155;font-size:13px;line-height:1.7}
+.np-activation-reference{position:relative;z-index:1;display:flex;flex-direction:column;gap:5px;padding:12px;border:1px solid #dbeafe;border-radius:12px;background:rgba(255,255,255,.76);overflow-wrap:anywhere}
+.np-activation-reference span{font-size:10px;color:#64748b;font-weight:700}.np-activation-reference b{font-size:11px;color:#1e3a8a}
+.np-activation-confirm{position:relative;z-index:1;width:100%;margin-top:18px;border:0;border-radius:12px;padding:13px 16px;background:linear-gradient(100deg,#1d4ed8,#7c3aed);color:#fff;font-size:13px;font-weight:900;cursor:pointer;box-shadow:0 8px 20px rgba(79,70,229,.25);transition:transform .18s ease,box-shadow .18s ease}
+.np-activation-confirm:hover{transform:translateY(-2px);box-shadow:0 12px 26px rgba(79,70,229,.32)}
+.np-activation-confetti{position:absolute;inset:0;z-index:0;pointer-events:none;color:#8b5cf6}
+.np-activation-confetti span{position:absolute;animation:npActivationSparkle 2.2s ease-in-out infinite}
+.np-activation-confetti span:nth-child(1){top:16%;left:13%;font-size:25px;color:#f59e0b}.np-activation-confetti span:nth-child(2){top:28%;right:12%;font-size:30px;color:#ec4899;animation-delay:.3s}.np-activation-confetti span:nth-child(3){top:48%;left:7%;font-size:18px;color:#06b6d4;animation-delay:.6s}.np-activation-confetti span:nth-child(4){top:53%;right:7%;font-size:24px;color:#8b5cf6;animation-delay:.9s}.np-activation-confetti span:nth-child(5){top:10%;right:32%;font-size:16px;color:#10b981;animation-delay:1.2s}
+@keyframes npActivationFade{from{opacity:0}to{opacity:1}}
+@keyframes npActivationPop{from{opacity:0;transform:translateY(18px) scale(.92)}to{opacity:1;transform:translateY(0) scale(1)}}
+@keyframes npActivationCheck{from{opacity:0;transform:scale(.55) rotate(-20deg)}to{opacity:1;transform:scale(1) rotate(0)}}
+@keyframes npActivationSparkle{0%,100%{transform:translateY(0) rotate(0);opacity:.5}50%{transform:translateY(-9px) rotate(18deg);opacity:1}}
+@media(prefers-reduced-motion:reduce){.np-activation-modal-backdrop,.np-activation-modal,.np-activation-check,.np-activation-confetti span{animation:none!important}}

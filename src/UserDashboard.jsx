@@ -116,6 +116,7 @@ export default function UserDashboard({ user, onLogout }) {
   const [actionBusy, setActionBusy] = useState(false);
   const [actionMessage, setActionMessage] = useState("");
   const [depositPopup, setDepositPopup] = useState(null);
+  const [activationPopup, setActivationPopup] = useState(null);
   const previousDepositStatuses = useRef(null);
   const [depositAmount, setDepositAmount] = useState("2");
   const [txHash, setTxHash] = useState("");
@@ -248,6 +249,13 @@ export default function UserDashboard({ user, onLogout }) {
         else finalResult = { ...result, message: verifyResult.error || "Deposit submitted and awaiting blockchain verification." };
       }
       setActionMessage(finalResult.message || "Request submitted.");
+      if (action === "package-purchase") {
+        setActivationPopup({
+          title: "Package Activated Successfully!",
+          message: `${payload.package_name || "Your package"} is now active. ${money(finalResult.record?.amount)} has been deducted from your Fund Wallet.`,
+          reference: finalResult.record?.reference || "",
+        });
+      }
       if (action !== "deposit-request" || String(finalResult.status || "").toLowerCase() === "approved") setTxHash("");
       setWithdrawAmount("");
       await load();
@@ -322,6 +330,17 @@ export default function UserDashboard({ user, onLogout }) {
 
   return (
     <main className="np-user-shell">
+      {activationPopup && <div className="np-activation-modal-backdrop" role="dialog" aria-live="assertive" aria-modal="true">
+        <section className="np-activation-modal">
+          <div className="np-activation-confetti" aria-hidden="true"><span>✦</span><span>✧</span><span>✦</span><span>✧</span><span>✦</span></div>
+          <div className="np-activation-check" aria-hidden="true">✓</div>
+          <p className="np-activation-kicker">NOVOPAY FINANCE</p>
+          <h2>{activationPopup.title}</h2>
+          <p className="np-activation-message">{activationPopup.message}</p>
+          {activationPopup.reference && <div className="np-activation-reference"><span>Activation Reference</span><b>{activationPopup.reference}</b></div>}
+          <button type="button" className="np-activation-confirm" onClick={() => { setActivationPopup(null); setActionMessage(""); load(); }}>Great, Continue</button>
+        </section>
+      </div>}
       {depositPopup && <div role="dialog" aria-live="assertive" aria-modal="true" style={{position:"fixed",inset:0,zIndex:9999,background:"rgba(4,8,18,.72)",display:"grid",placeItems:"center",padding:20}}>
         <section style={{width:"min(420px,100%)",background:"#101827",color:"#fff",border:"1px solid #b99750",borderRadius:20,padding:28,textAlign:"center",boxShadow:"0 24px 80px rgba(0,0,0,.45)"}}>
           <div style={{width:54,height:54,borderRadius:99,margin:"0 auto 14px",display:"grid",placeItems:"center",fontSize:28,fontWeight:800,background:depositPopup.type==="success"?"#164e3a":"#5b2028",color:depositPopup.type==="success"?"#86efac":"#fca5a5"}}>{depositPopup.type==="success"?"✓":"!"}</div>
@@ -456,7 +475,7 @@ export default function UserDashboard({ user, onLogout }) {
                 const daily = price * rate / 100;
                 const total = daily * days;
                 const enough = Number(profile?.fund_balance || 0) >= price;
-                return <article className="np-basic-plan" key={row.id}>
+                return <article className={`np-basic-plan np-basic-plan-color-${(rows.indexOf(row) % 4) + 1}`} key={row.id}>
                   <div className="np-basic-plan-top"><div><h3>{row.name}</h3><small>{row.package_code || ""}</small></div><span className={`np-user-status ${statusClass(row.status)}`}>{row.status}</span></div>
                   <div className="np-basic-plan-amount"><span>Plan Amount</span><strong>{price.toLocaleString("en-US", {minimumFractionDigits:2,maximumFractionDigits:2})}</strong><small>USDT</small></div>
                   <div className="np-basic-plan-metrics">
@@ -467,7 +486,7 @@ export default function UserDashboard({ user, onLogout }) {
                   <div className="np-basic-plan-note"><b>Daily {rate}% ROI</b><p>Configured daily return for {days} days. Total Profit excludes principal.</p></div>
                   <div className="np-basic-plan-profit"><span>Total Profit</span><strong>{total.toLocaleString("en-US", {minimumFractionDigits:2,maximumFractionDigits:2})} USDT</strong></div>
                   <button className="np-basic-purchase" disabled={actionBusy || !enough} onClick={() => {
-                    if (window.confirm(`Purchase ${row.name} for ${money(price)} from your available USDT balance?`)) submitAction("package-purchase", { package_id: row.id });
+                    if (window.confirm(`Purchase ${row.name} for ${money(price)} from your available USDT balance?`)) submitAction("package-purchase", { package_id: row.id, package_name: row.name });
                   }}>{actionBusy ? "Processing…" : enough ? "Purchase with USDT" : "Insufficient USDT — Add USDT"}</button>
                 </article>;
               })}</div> : <Empty title="No Basic plans available" message="No active Basic plans are configured right now." />}
@@ -477,7 +496,7 @@ export default function UserDashboard({ user, onLogout }) {
                 {loading ? <Loading/> : (data?.activations || []).length ? <><div className="np-user-table-wrap"><table className="np-user-table np-basic-history-table"><thead><tr><th>#</th><th>Date</th><th>Package</th><th>Amount (USDT)</th><th>Status</th></tr></thead><tbody>{(data.activations || []).slice(0,historyEntries).map((item,index)=><tr key={item.id || item.reference}><td>{index+1}</td><td>{date(item.activated_at || item.created_at)}</td><td>{item.package_name || "Package"}</td><td>USDT {Number(item.amount || 0).toFixed(8)}</td><td><span className={`np-user-status ${statusClass(item.status)}`}>{item.status}</span></td></tr>)}</tbody></table></div><p className="np-basic-history-count">Showing 1 to {Math.min(historyEntries,data.activations.length)} of {data.activations.length} entries</p></> : <Empty title="No purchases yet" message="Your completed package activations will appear here."/>}
               </section>
             </section>}
-            {section !== "basic-package" && <section className="np-user-panel"><PanelTitle title={section === "fd-package" ? "Available FD packages" : "Available packages"} subtitle="Available plans and their current terms" />{loading ? <Loading /> : rows.length ? <div className="np-user-package-grid">{rows.map(row => { const daily = Number(row.price || 0) * Number(row.roi_rate || 0) / 100; const total = daily * Number(row.duration_days || 0); return <article className="np-user-package" key={row.id}><span className="np-user-package-icon"><Package size={21} /></span><span className={`np-user-status ${statusClass(row.status)}`}>{row.status}</span><small className="np-user-eyebrow">{String(row.package_type || "package").toUpperCase()} {row.package_code ? "· " + row.package_code : ""}</small><h3>{row.name}</h3><strong>{money(row.price)}</strong><p>{row.description || "Package terms are configured by NovoPay."}</p>{row.roi_rate != null && row.duration_days != null && <div className="np-user-package-terms"><p>Daily rate: <b>{Number(row.roi_rate).toFixed(2)}%</b></p><p>Daily amount: <b>{money(daily)}</b></p><p>Duration: <b>{Number(row.duration_days)} days</b></p><p>Total scheduled return: <b>{money(total)}</b></p>{row.package_type === "fd" && <p>Maturity estimate: <b>{money(Number(row.price) + total)}</b></p>}</div>}<button disabled={actionBusy || Number(profile?.fund_balance || 0) < Number(row.price || 0)} onClick={() => { if (window.confirm("Activate " + row.name + " for " + money(row.price) + " from your Fund Wallet?")) submitAction("package-purchase", { package_id: row.id }); }}>{actionBusy ? "Processing…" : Number(profile?.fund_balance || 0) < Number(row.price || 0) ? "Insufficient balance" : "Activate package"}</button></article>; })}</div> : <Empty title="No packages available" message="No plans are available right now. Please check back later." />}</section>}
+            {section !== "basic-package" && <section className={`np-user-panel ${section === "fd-package" ? "np-fd-package-panel" : "np-package-panel"}`}><PanelTitle title={section === "fd-package" ? "Available FD packages" : "Available packages"} subtitle="Available plans and their current terms" />{loading ? <Loading /> : rows.length ? <div className={`np-user-package-grid ${section === "fd-package" ? "np-fd-package-grid" : "np-standard-package-grid"}`}>{rows.map((row, packageIndex) => { const daily = Number(row.price || 0) * Number(row.roi_rate || 0) / 100; const total = daily * Number(row.duration_days || 0); return <article className={`np-user-package np-color-package ${section === "fd-package" ? "np-fd-color-package" : "np-basic-color-package"} np-package-color-${(packageIndex % 4) + 1}`} key={row.id}><span className="np-user-package-icon"><Package size={21} /></span><span className={`np-user-status ${statusClass(row.status)}`}>{row.status}</span><small className="np-user-eyebrow">{String(row.package_type || "package").toUpperCase()} {row.package_code ? "· " + row.package_code : ""}</small><h3>{row.name}</h3><strong>{money(row.price)}</strong><p>{row.description || "Package terms are configured by NovoPay."}</p>{row.roi_rate != null && row.duration_days != null && <div className="np-user-package-terms"><p>Daily rate: <b>{Number(row.roi_rate).toFixed(2)}%</b></p><p>Daily amount: <b>{money(daily)}</b></p><p>Duration: <b>{Number(row.duration_days)} days</b></p><p>Total scheduled return: <b>{money(total)}</b></p>{row.package_type === "fd" && <p>Maturity estimate: <b>{money(Number(row.price) + total)}</b></p>}</div>}<button disabled={actionBusy || Number(profile?.fund_balance || 0) < Number(row.price || 0)} onClick={() => { if (window.confirm("Activate " + row.name + " for " + money(row.price) + " from your Fund Wallet?")) submitAction("package-purchase", { package_id: row.id }); }}>{actionBusy ? "Processing…" : Number(profile?.fund_balance || 0) < Number(row.price || 0) ? "Insufficient balance" : "Activate package"}</button></article>; })}</div> : <Empty title="No packages available" message="No plans are available right now. Please check back later." />}</section>}
           </>}
           {!error && section === "referrals" && <section className="np-user-referrals">
             <div className="np-user-panel np-user-referral-card">
