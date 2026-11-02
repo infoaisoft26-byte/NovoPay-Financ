@@ -27,13 +27,13 @@ export default async function handler(req, res) {
   try {
     // Process every missed IST business date since the last successful run.
     // Ledger idempotency keys make retries safe and prevent duplicate credits.
-    const previous = await sql\`
+    const previous = await sql`
       SELECT MAX(entity_id)::text AS last_date
       FROM audit_logs
       WHERE action = 'daily_roi_settlement'
         AND entity_type = 'settlement'
         AND entity_id ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}$'
-    \`;
+    `;
     const lastDate = previous[0]?.last_date;
     const cursor = new Date((lastDate || today) + "T00:00:00.000Z");
     if (lastDate) cursor.setUTCDate(cursor.getUTCDate() + 1);
@@ -49,7 +49,7 @@ export default async function handler(req, res) {
     let creditedAmount = 0;
     let usersUpdated = 0;
     for (const settlementDate of settlementDates) {
-      const rows = await sql`
+      rows = await sql`
         WITH business AS (
           SELECT ${settlementDate}::date AS settle_date
         ), investments AS (
