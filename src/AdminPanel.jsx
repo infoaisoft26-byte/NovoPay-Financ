@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   LayoutDashboard, Users, ArrowDownToLine, ArrowUpFromLine, ReceiptText,
   Package, ChartNoAxesCombined, Settings, Search, Bell, Menu, X, ShieldCheck,
@@ -144,6 +144,10 @@ export default function AdminPanel({ user, onLogout }) {
   const [query, setQuery] = useState("");
   const [lastRefresh, setLastRefresh] = useState(null);
   const [notice, setNotice] = useState("");
+  const [incomingAlert, setIncomingAlert] = useState(null);
+  const seenPendingRequests = useRef(null);
+  const [posterTitle, setPosterTitle] = useState("");
+  const [posterImage, setPosterImage] = useState("");
   const [rows, setRows] = useState([]);
   const [overviewCounts, setOverviewCounts] = useState(null);
   const [recentActivity, setRecentActivity] = useState([]);
@@ -219,9 +223,28 @@ export default function AdminPanel({ user, onLogout }) {
   }, [section, query, reloadKey, user]);
 
   useEffect(() => {
-    const interval = window.setInterval(() => setReloadKey(value => value + 1), 15000);
-    return () => window.clearInterval(interval);
-  }, []);
+    let stopped = false;
+    const pollAdminRequests = async () => {
+      try {
+        const token = await user.getIdToken();
+        const response = await fetch("/api/admin?section=overview", { headers: { Authorization: "Bearer " + token }, cache: "no-store" });
+        if (!response.ok) return;
+        const payload = await response.json();
+        const requests = Array.isArray(payload.pendingRequests) ? payload.pendingRequests : [];
+        if (stopped) return;
+        const keys = requests.map(row => String(row.kind) + ":" + String(row.reference));
+        if (seenPendingRequests.current) {
+          const known = new Set(seenPendingRequests.current);
+          const fresh = requests.find(row => !known.has(String(row.kind) + ":" + String(row.reference)));
+          if (fresh) setIncomingAlert(fresh);
+        }
+        seenPendingRequests.current = keys;
+      } catch { /* Retry on the next poll without interrupting the admin workspace. */ }
+    };
+    pollAdminRequests();
+    const interval = window.setInterval(() => { pollAdminRequests(); setReloadKey(value => value + 1); }, 15000);
+    return () => { stopped = true; window.clearInterval(interval); };
+  }, [user]);
 
   function startNewPackage() {
     setPackageForm({ ...blankPackage, package_code: "BASIC_" + Date.now().toString().slice(-6) });
@@ -269,6 +292,26 @@ export default function AdminPanel({ user, onLogout }) {
     } finally {
       setActionBusy("");
     }
+  }
+
+  async function savePoster(event) {
+    event.preventDefault();
+    if (!posterTitle.trim() || !posterImage) { setDataError("Enter a poster title and choose an image."); return; }
+    setActionBusy("poster-save"); setDataError(""); setNotice("");
+    try {
+      const token = await user.getIdToken();
+      const response = await fetch("/api/admin-actions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: "Bearer " + token },
+        body: JSON.stringify({ action: "save-poster", title: posterTitle.trim(), image_url: posterImage })
+      });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(payload.error || "Poster could not be published.");
+      setPosterTitle(""); setPosterImage("");
+      setNotice("Poster published. It will appear to members when they sign in.");
+      setReloadKey(value => value + 1);
+    } catch (error) { setDataError(error.message || "Poster could not be published."); }
+    finally { setActionBusy(""); }
   }
 
   async function savePlatformSettings() {
@@ -335,6 +378,8 @@ export default function AdminPanel({ user, onLogout }) {
       actions.push(["user-status", row.status === "suspended" ? "Activate user" : "Suspend user", row.status === "suspended" ? "success" : "danger"]);
     } else if (section === "Support Tickets" && !["closed", "resolved"].includes(row.status)) {
       actions.push(["support-status", "Resolve ticket", "success"], ["support-status", "Close ticket", "danger"]);
+    } else if (section === "Offer Posters") {
+      actions.push(["poster-status", row.status === "active" ? "Pause poster" : "Publish poster", row.status === "active" ? "danger" : "success"]);
     } else if (section === "Packages") {
       actions.push(["package-status", row.status === "active" ? "Pause package" : "Activate package", row.status === "active" ? "danger" : "success"]);
     }
@@ -394,6 +439,15 @@ export default function AdminPanel({ user, onLogout }) {
             <div><p className="np-admin-eyebrow">NOVOPAY FINANCE / ADMIN CONTROL DESK</p><h1>{section}</h1><p className="np-admin-subtitle">{descriptions[section]}</p></div>
             {["Reports", "Income Reports", "Transactions", "Deposits", "Withdrawals", "Package Activations"].includes(section) && <button className="np-admin-refresh" onClick={() => window.print()}><Download size={16}/> Download PDF</button>}<button className="np-admin-refresh" onClick={requestRefresh}><RefreshCw size={16}/> Refresh</button>
           </div>
+          {incomingAlert && <div className="np-admin-alert-backdrop" role="dialog" aria-modal="true">
+            <section className="np-admin-alert-card">
+              <span className="np-admin-alert-kicker">NEW MEMBER REQUEST</span>
+              <h2>{incomingAlert.kind === "deposit" ? "New Fund Deposit" : incomingAlert.kind === "withdrawal" ? "New Withdrawal Request" : "New Package Purchase"}</h2>
+              <p>{incomingAlert.user_id || "Member"} · {Number(incomingAlert.amount || 0).toFixed(2)} {incomingAlert.currency || "USDT"}</p>
+              <small>Reference: {incomingAlert.reference}</small>
+              <div><button className="np-admin-action-button" onClick={()=>setIncomingAlert(null)}>Dismiss</button><button className="np-admin-action-button success" onClick={()=>{setSection(incomingAlert.kind==="deposit"?"Deposits":incomingAlert.kind==="withdrawal"?"Withdrawals":"Package Activations");setIncomingAlert(null);setQuery("");}}>Review request</button></div>
+            </section>
+          </div>}
           {notice && <div className="np-admin-notice" role="status"><CircleHelp size={17}/><span>{notice}</span><button onClick={() => setNotice("")} aria-label="Dismiss"><X size={16}/></button></div>}
           {dataError.includes("Admin server permission is not set") && <div className="np-admin-inline-error" role="alert"><ShieldAlert size={17}/><span>Admin permission setup is required for this Firebase account.</span><button className="np-admin-refresh" disabled={settingUpAdmin} onClick={async () => { setSettingUpAdmin(true); setDataError(""); try { const token = await user.getIdToken(true); const response = await fetch("/api/setup-admin", { method: "POST", headers: { Authorization: "Bearer " + token } }); const payload = await response.json().catch(() => ({})); if (!response.ok) throw new Error(payload.error || "Admin setup could not be completed."); await user.getIdToken(true); setDataError(""); setNotice("Admin access setup complete. Loading your admin records."); setReloadKey(value => value + 1); } catch (error) { setDataError(error.message || "Admin setup could not be completed."); } finally { setSettingUpAdmin(false); } }}>{settingUpAdmin ? "Setting up…" : "Set up admin access"}</button></div>}
 
@@ -487,6 +541,13 @@ export default function AdminPanel({ user, onLogout }) {
             <div className="np-admin-data-toolbar"><div className="np-admin-data-title"><span className="np-admin-stat-icon"><ActiveIcon size={19}/></span><div><h3>{section} management</h3><p>{descriptions[section]}</p></div></div>
               <label className="np-admin-search"><Search size={16}/><input value={query} onChange={e => setQuery(e.target.value)} placeholder={section === "Users" ? "Search by email or NovoPay ID" : "Search records"} /></label>
             </div>
+            {section === "Offer Posters" && <form className="np-admin-poster-upload" onSubmit={savePoster}>
+              <div><b>Publish a login poster</b><small>Active posters appear to members when they sign in. Use PNG, JPG, WEBP or GIF up to 2 MB.</small></div>
+              <label>Poster title<input required maxLength={120} value={posterTitle} onChange={e=>setPosterTitle(e.target.value)} placeholder="Welcome / Special announcement"/></label>
+              <label>Poster image<input required type="file" accept="image/png,image/jpeg,image/webp,image/gif" onChange={e=>{const file=e.target.files?.[0];if(!file)return;if(file.size>2*1024*1024){setDataError("Poster image must be 2 MB or smaller.");e.target.value="";return;}const reader=new FileReader();reader.onload=()=>setPosterImage(String(reader.result||""));reader.onerror=()=>setDataError("Poster image could not be read.");reader.readAsDataURL(file);}}/></label>
+              {posterImage && <img className="np-admin-poster-upload-preview" src={posterImage} alt="Poster upload preview"/>}
+              <button className="np-admin-action-button success" type="submit" disabled={actionBusy==="poster-save"}>{actionBusy==="poster-save" ? "Publishing…" : "Publish to all users"}</button>
+            </form>}
             {section === "Packages" && <div className="np-admin-package-summary"><span><b>{rows.filter(row=>row.status==="active" && row.package_type==="basic").length}</b> Active Basic Plans</span><span><b>{rows.filter(row=>row.status==="active" && row.package_type==="fd").length}</b> Active FD Plans</span><span><b>Simple daily return</b> Calculation Mode</span></div>}
             <div className="np-admin-table-head">{(tableColumns[section] || ["RECORD", "STATUS", "DETAILS"]).map(col => <span key={col}>{col}</span>)}</div>
             {dataError && <div className="np-admin-inline-error" role="status"><ShieldAlert size={17}/><span>{dataError}</span></div>}
