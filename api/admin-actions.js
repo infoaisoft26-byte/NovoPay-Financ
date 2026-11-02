@@ -235,11 +235,11 @@ export default async function handler(req, res) {
       const validImageUrl = imageUrl.startsWith("https://");
       if (!validDataImage && !validImageUrl) return res.status(400).json({ error: "Upload an image or use a secure HTTPS image link." });
       result = await db`INSERT INTO offer_posters(title,image_url,status)
-        VALUES (${title},${imageUrl},'active')
+        VALUES (${title},${imageUrl},'published')
         RETURNING id,title,image_url,status,starts_at,ends_at,created_at`;
       if (result[0]) await db`INSERT INTO audit_logs(actor_uid,action,entity_type,entity_id,details)
         VALUES (${actor.uid},'poster_published','offer_poster',${String(result[0].id)},jsonb_build_object('title',${title}))`;
-    } else if (action === "poster-status" && id && ["active","paused","archived"].includes(status)) {
+    } else if (action === "poster-status" && id && ["published","draft","archived"].includes(status)) {
       result = await db`UPDATE offer_posters SET status=${status} WHERE id::text=${id}
         RETURNING id,title,image_url,status,starts_at,ends_at,created_at`;
       if (result[0]) await db`INSERT INTO audit_logs(actor_uid,action,entity_type,entity_id,details)
