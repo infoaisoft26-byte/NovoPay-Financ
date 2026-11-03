@@ -50,7 +50,7 @@ export default async function handler(req, res) {
     let usersUpdated = 0;
     for (const settlementDate of settlementDates) {
       rows = await sql`
-        WITH business AS (
+        WITH RECURSIVE business AS (
           SELECT ${settlementDate}::date AS settle_date
         ), investments AS (
           SELECT a.user_id, COALESCE(SUM(a.amount), 0)::numeric * 5 AS total_cap
