@@ -32,9 +32,7 @@ export default function App() {
   useEffect(() => {
     // Festive welcome is globally time-limited to the first 24 hours after launch.
     const campaignEndsAt = Date.parse("2026-11-09T09:34:00Z");
-    const seenKey = "novopay-diwali-welcome-2026";
-    if (Date.now() >= campaignEndsAt || localStorage.getItem(seenKey)) return undefined;
-    localStorage.setItem(seenKey, "1");
+    if (Date.now() >= campaignEndsAt) return undefined;
 
     const style = document.createElement("style");
     style.dataset.novopayDiwali = "true";
