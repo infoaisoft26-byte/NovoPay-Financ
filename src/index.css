@@ -272,3 +272,5 @@
 .np-admin-alert-card{width:min(440px,100%);padding:28px;border-radius:20px;border:1px solid rgba(212,175,98,.6);background:#101827;color:#f8fafc;box-shadow:0 28px 90px rgba(0,0,0,.55);animation:np-admin-enter .24s ease-out}
 .np-admin-alert-kicker{color:#d4af62;font-size:10px;font-weight:900;letter-spacing:.18em}.np-admin-alert-card h2{margin:12px 0 8px;font-size:24px}.np-admin-alert-card p{color:#e2e8f0}.np-admin-alert-card small{color:#94a3b8;overflow-wrap:anywhere}.np-admin-alert-card>div{display:flex;justify-content:flex-end;gap:10px;margin-top:22px}
 @media(max-width:800px){.np-admin-poster-upload{grid-template-columns:1fr}.np-admin-poster-upload-preview{width:100%;height:150px}}
+
+/* NovoPay Diwali welcome overlay is injected by App.jsx and scoped to .np-diwali-* */
