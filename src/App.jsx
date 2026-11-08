@@ -28,6 +28,63 @@ export default function App() {
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState("");
 
+
+  useEffect(() => {
+    // Festive welcome is globally time-limited to the first 24 hours after launch.
+    const campaignEndsAt = Date.parse("2026-11-09T09:32:00Z");
+    const seenKey = "novopay-diwali-welcome-2026";
+    if (Date.now() >= campaignEndsAt || localStorage.getItem(seenKey)) return undefined;
+    localStorage.setItem(seenKey, "1");
+
+    const style = document.createElement("style");
+    style.dataset.novopayDiwali = "true";
+    style.textContent = `
+      .np-diwali-overlay{position:fixed;inset:0;z-index:99999;display:grid;place-items:center;overflow:hidden;background:radial-gradient(ellipse at 50% 42%,#43205d 0%,#160d2d 48%,#080817 100%);color:#fff;opacity:1;transition:opacity .9s ease}
+      .np-diwali-overlay.np-diwali-out{opacity:0;pointer-events:none}
+      .np-diwali-stars{position:absolute;inset:0;overflow:hidden}
+      .np-diwali-star{position:absolute;width:3px;height:3px;border-radius:50%;background:#ffe9a6;box-shadow:0 0 12px 3px #ffc94b;animation:np-twinkle 1.5s ease-in-out infinite alternate}
+      .np-diwali-burst{position:absolute;width:5px;height:5px;border-radius:50%;background:transparent;animation:np-firework 1.7s ease-out infinite}
+      .np-diwali-burst:before,.np-diwali-burst:after{content:"";position:absolute;inset:-3px;border-radius:50%;background:conic-gradient(from 0deg,transparent 0 8%,#ffd76b 9% 11%,transparent 12% 22%,#ff8b55 23% 25%,transparent 26% 36%,#fff0ae 37% 39%,transparent 40% 50%,#f7a5ff 51% 53%,transparent 54% 64%,#ffd76b 65% 67%,transparent 68% 78%,#ff8b55 79% 81%,transparent 82%)}
+      .np-diwali-burst:after{transform:rotate(45deg)}
+      .np-diwali-content{position:relative;z-index:2;text-align:center;padding:28px;animation:np-rise .9s .2s both}
+      .np-diwali-lamp{font-size:clamp(44px,8vw,76px);filter:drop-shadow(0 0 20px #ffb83d);animation:np-lamp 1.3s ease-in-out infinite alternate}
+      .np-diwali-brand{margin:14px 0 0;font:700 12px/1.4 'DM Sans',sans-serif;letter-spacing:5px;color:#f9d98a;text-transform:uppercase}
+      .np-diwali-title{margin:18px 0 10px;font:900 clamp(38px,8vw,76px)/1.02 'Manrope',sans-serif;letter-spacing:2px;background:linear-gradient(100deg,#fff6cf,#ffc34d 45%,#fff1b4 70%,#e8a7ff);background-clip:text;-webkit-background-clip:text;color:transparent;text-shadow:0 8px 45px #f5ad5033;opacity:0;animation:np-title-in 1s 3.1s forwards}
+      .np-diwali-sub{font:500 clamp(13px,2vw,18px)/1.7 'DM Sans',sans-serif;color:#f8e9ca;letter-spacing:1px;opacity:0;animation:np-title-in .8s 3.7s forwards}
+      .np-diwali-rule{width:90px;height:2px;margin:22px auto;background:linear-gradient(90deg,transparent,#ffcf6b,transparent);opacity:0;animation:np-title-in .8s 4s forwards}
+      .np-diwali-footer{font:600 10px/1.5 'DM Sans',sans-serif;letter-spacing:3px;color:#e6c6a1;opacity:0;animation:np-title-in .8s 4.3s forwards}
+      @keyframes np-twinkle{from{opacity:.18;transform:scale(.65)}to{opacity:1;transform:scale(1.5)}}
+      @keyframes np-firework{0%{transform:scale(.1);opacity:0}12%{opacity:1}100%{transform:scale(18);opacity:0}}
+      @keyframes np-rise{from{opacity:0;transform:translateY(18px) scale(.97)}to{opacity:1;transform:translateY(0) scale(1)}}
+      @keyframes np-title-in{from{opacity:0;transform:translateY(15px);filter:blur(7px)}to{opacity:1;transform:translateY(0);filter:blur(0)}}
+      @keyframes np-lamp{from{transform:translateY(0) scale(1);filter:drop-shadow(0 0 12px #ffb83d)}to{transform:translateY(-5px) scale(1.05);filter:drop-shadow(0 0 28px #ffcf6b)}}
+      @media(prefers-reduced-motion:reduce){.np-diwali-star,.np-diwali-burst,.np-diwali-lamp,.np-diwali-title,.np-diwali-sub,.np-diwali-rule,.np-diwali-footer,.np-diwali-content{animation:none!important;opacity:1!important}.np-diwali-overlay{transition:none}}
+    `;
+    document.head.appendChild(style);
+    const overlay = document.createElement("div");
+    overlay.className = "np-diwali-overlay";
+    overlay.setAttribute("role", "dialog");
+    overlay.setAttribute("aria-label", "Happy Diwali from NovoPay Finance");
+    const stars = Array.from({ length: 46 }, (_, i) => {
+      const left = (i * 37 + 11) % 100;
+      const top = (i * 61 + 7) % 100;
+      const delay = (i % 9) * .19;
+      return '<i class="np-diwali-star" style="left:' + left + '%;top:' + top + '%;animation-delay:' + delay + 's"></i>';
+    }).join("");
+    const fireworks = [[18,24,0],[78,20,.45],[84,66,.9],[14,70,1.25],[50,12,1.6],[65,78,2]];
+    overlay.innerHTML = '<div class="np-diwali-stars">' + stars + fireworks.map(([x,y,d]) => '<i class="np-diwali-burst" style="left:' + x + '%;top:' + y + '%;animation-delay:' + d + 's"></i>').join("") + '</div><div class="np-diwali-content"><div class="np-diwali-lamp" aria-hidden="true">🪔</div><div class="np-diwali-brand">NovoPay Finance</div><h1 class="np-diwali-title">HAPPY DIWALI</h1><p class="np-diwali-sub">May your life shine with prosperity, happiness &amp; new beginnings</p><div class="np-diwali-rule"></div><div class="np-diwali-footer">WISHING YOU A BRIGHT &amp; JOYFUL DIWALI</div></div>';
+    document.body.appendChild(overlay);
+    const closeTimer = window.setTimeout(() => {
+      overlay.classList.add("np-diwali-out");
+      window.setTimeout(() => overlay.remove(), 950);
+    }, 8200);
+    return () => {
+      window.clearTimeout(closeTimer);
+      overlay.remove();
+      style.remove();
+    };
+  }, []);
+
   const isAdminPath = path.startsWith("/admin");
   const isDashboardPath = path.startsWith("/dashboard");
 
